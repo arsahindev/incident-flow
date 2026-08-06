@@ -29,7 +29,7 @@ export default function Home() {
               Incident dashboard
             </h1>
             <p className="mt-2 max-w-2xl text-slate-400">
-              Monitor, coordinate, and resolve service incidents from one place.
+              Monitor, coordinate and resolve service incidents from one place.
             </p>
           </div>
           <button
