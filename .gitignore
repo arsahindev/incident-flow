@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment files (the example is safe to commit)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Tooling and operating-system files
+.DS_Store
+*.log
+.pnpm-debug.log*
+
+# Editor files
+.idea/
+.vscode/
