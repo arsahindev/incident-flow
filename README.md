@@ -2,16 +2,18 @@
 
 IncidentFlow is a multi-tenant incident intake, routing, notification, and response-coordination SaaS for backend teams. It is being built as a production-minded full-stack portfolio project, one working vertical slice at a time.
 
-## Current milestone: Phase 0
+## Current milestone: Phase 1
 
-The repository currently contains only the local foundation:
+The first product vertical slice is working locally:
 
 - a pnpm monorepo;
-- a Next.js dashboard shell in `apps/web`;
-- a Fastify API with `GET /health` in `apps/api`;
+- a Next.js dashboard with incident creation, listing, detail, and lifecycle controls;
+- a validated Fastify API for teams and incidents;
+- Prisma migrations and a seeded development organization/team;
+- transactional incident activity history for creation, assignment, and status changes;
 - PostgreSQL in Docker Compose with a persistent named volume.
 
-Authentication, incident persistence, WebSockets, queues, AWS resources, and AI are intentionally deferred to their roadmap phases.
+Authentication, WebSockets, queues, AWS resources, and AI are intentionally deferred to their roadmap phases.
 
 ## Prerequisites
 
@@ -25,6 +27,8 @@ Authentication, incident persistence, WebSockets, queues, AWS resources, and AI 
 cp .env.example .env
 pnpm install
 docker compose up -d db
+pnpm db:migrate
+pnpm db:seed
 pnpm dev
 ```
 
@@ -57,6 +61,18 @@ docker compose ps
 docker compose down
 ```
 
+Create and apply a development migration after editing the Prisma schema:
+
+```bash
+pnpm db:migrate --name describe_your_change
+```
+
+The seed command is idempotent and can safely restore the development organization and Platform team:
+
+```bash
+pnpm db:seed
+```
+
 `docker compose down` stops the database but preserves `postgres_data`, so data survives container recreation. Running `docker compose down --volumes` deliberately deletes that local data.
 
 ## Repository structure
@@ -77,4 +93,4 @@ incidentflow/
 
 ## Next milestone
 
-Phase 1 will add Prisma migrations, a seeded development organization and team, and the manual incident lifecycle: create, list, view, update status, and record activity.
+Phase 2 will add authentication, users, organization memberships, roles, and server-side authorization checks. Until then, the API deliberately derives tenant context from the seeded development organization rather than trusting an organization ID from the browser.

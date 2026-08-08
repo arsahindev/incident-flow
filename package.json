@@ -7,10 +7,14 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "postinstall": "pnpm --filter @incidentflow/api prisma:generate",
     "dev": "pnpm --parallel --filter @incidentflow/api --filter @incidentflow/web dev",
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "db:migrate": "pnpm --filter @incidentflow/api db:migrate",
+    "db:seed": "pnpm --filter @incidentflow/api db:seed",
+    "db:studio": "pnpm --filter @incidentflow/api db:studio"
   }
 }
