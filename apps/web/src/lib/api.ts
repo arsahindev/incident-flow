@@ -1,6 +1,15 @@
 import "server-only";
 
-import type { IncidentDetail, IncidentSummary, Team } from "./types";
+import type {
+  IncidentDetail,
+  IncidentPagination,
+  IncidentPriority,
+  IncidentStatus,
+  IncidentSummary,
+  Service,
+  ServiceDetail,
+  Team,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -36,8 +45,22 @@ export async function requestApi<T>(path: string, init?: RequestInit): Promise<T
   return body;
 }
 
-export function getIncidents() {
-  return requestApi<{ incidents: IncidentSummary[] }>("/v1/incidents");
+export function getIncidents(filters: {
+  serviceId?: string;
+  teamId?: string;
+  status?: IncidentStatus;
+  priority?: IncidentPriority;
+  page?: number;
+} = {}) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const query = search.size > 0 ? `?${search.toString()}` : "";
+  return requestApi<{
+    incidents: IncidentSummary[];
+    pagination: IncidentPagination;
+  }>(`/v1/incidents${query}`);
 }
 
 export function getTeams() {
@@ -46,4 +69,12 @@ export function getTeams() {
 
 export function getIncident(incidentId: string) {
   return requestApi<{ incident: IncidentDetail }>(`/v1/incidents/${incidentId}`);
+}
+
+export function getServices() {
+  return requestApi<{ services: Service[] }>("/v1/services");
+}
+
+export function getService(serviceId: string) {
+  return requestApi<{ service: ServiceDetail }>(`/v1/services/${serviceId}`);
 }

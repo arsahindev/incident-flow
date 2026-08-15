@@ -860,14 +860,17 @@ Each phase must produce a demonstrable user or operator outcome, include tests p
 
 Known intentional limitation: tenant context is temporarily derived from a fixed seeded development organization until Phase 2 authentication. Do not mistake this for production authorization.
 
-### Phase 1.5 — service catalog and affected services (recommended next)
+### Phase 1.5 — service catalog and affected services (complete)
 
 This is a domain-foundation milestone, not scope creep. It makes IncidentFlow authentically service-oriented before authentication, webhook routing, rules, and notifications depend on the wrong model.
+
+Implemented outcome: the organization has a service catalog with service-owned environments; incidents can affect multiple services with one primary designation; users can manage services/environments, see service-specific incident history, and filter incidents by service, team, status, and priority. Existing development incidents were intentionally left unclassified rather than receiving fabricated affected-service history. Newly created incidents require at least one affected service at the API/UI boundary.
 
 #### Data and invariants
 
 - Add `services` with organization, owning team, name/slug, description, type, tier, operational status, timestamps, and suitable indexes.
 - Add service-owned environments with a unique name/slug per service, kind, active/archived lifecycle, and optional ephemeral/expiry metadata. Seed normal development/staging/production examples without requiring every service to use the same set.
+- Enforce that only ephemeral service environments may have an expiry through API validation, repository state validation, and a PostgreSQL check constraint.
 - Add `incident_affected_services` with organization-scoped composite foreign keys, unique incident/service membership, `is_primary`, and an at-most-one-primary constraint.
 - Seed realistic services such as Checkout API, Payment Processing, Customer Portal, PostgreSQL Primary, and Stripe.
 - Migrate existing development incidents safely; either leave them temporarily unclassified with clear UI or attach an explicit seeded service based on a documented migration decision.
@@ -1018,20 +1021,22 @@ Describe this milestone as ITIL-aligned, not certified.
 
 ---
 
-## Current code state — 2026-08-14
+## Current code state — 2026-08-15
 
 - Repository: `/Users/arsahin/Developer/incidentflow`.
-- Git is initialized. At the time of this handoff, the checked-out branch is `phase_1`; always inspect current branch/status before modifying files.
-- Phase 0 foundation and Phase 1 manual incident lifecycle are implemented.
-- Relevant milestone commit: `dd3a65d feat: add manual incident lifecycle`.
+- Git is initialized. At the time of this handoff, the checked-out branch is `phase_1_5`; always inspect current branch/status before modifying files.
+- Phase 0 foundation, Phase 1 manual incident lifecycle, and Phase 1.5 service catalog/affected services are implemented. The Phase 1.5 working tree has not been committed or pushed unless later Git history says otherwise.
+- Phase 1 baseline commit: `e43f355 feat: complete phase 1 manual incident lifecycle`.
 - pnpm workspace contains `apps/web`, `apps/api`, and the placeholder `packages/contracts`.
-- Next.js dashboard supports incident creation, listing, detail, status/team updates, and activity history.
-- Fastify API exposes health, team, and incident lifecycle routes with Zod validation.
-- Prisma/PostgreSQL schema currently has organizations, teams, incidents, and incident activity. A migration and idempotent development seed exist.
-- PostgreSQL runs through Docker Compose with persistent storage. Phase 1 was verified through tests, production builds, browser interaction, API runtime, and database restart persistence.
-- The database may contain development incidents created during verification; do not assume it is empty.
+- Next.js dashboard supports incident creation/list/detail, status/team/affected-service updates, activity history, URL-backed filtering, pagination, and service catalog/detail/environment management.
+- Fastify API exposes health, team, service, service-environment, and incident lifecycle routes with Zod validation and repository seams.
+- Prisma/PostgreSQL includes organizations, teams, services, service environments, incidents, affected-service joins, and incident activity. Organization-scoped composite constraints prevent cross-tenant affected-service references, and a partial unique index permits at most one primary service per incident.
+- The idempotent seed creates the development organization, Platform team, five representative services, and realistic environments.
+- Baseline GitHub Actions CI provisions PostgreSQL and runs frozen installation, migration deployment, lint, typecheck, unit tests, database integration tests, production build, and a high-severity production-dependency audit.
+- PostgreSQL runs through Docker Compose with persistent storage. Phase 1.5 was verified through lint, standalone typecheck, unit/API tests, real-PostgreSQL constraint tests, production builds, dependency audit, browser interaction, service filtering, and incident primary-service changes.
+- The database contains development records created during verification, including an Order Routing API service, preview environment, and linked incident; do not assume it is empty.
 - Authentication is not implemented. API tenant context still uses the seeded development organization and is not production authorization.
-- Services, service environments, and affected-service relations are not implemented yet; Phase 1.5 is the recommended next milestone.
+- Phase 2 identity, memberships, roles, sessions, and server-side authorization is the recommended next milestone.
 - Existing uncommitted user changes may be present. Always inspect and preserve them; never treat a dirty worktree as disposable.
 
 ### Local development
@@ -1057,7 +1062,9 @@ Quality gate:
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:integration
 pnpm build
+pnpm audit --prod --audit-level high
 ```
 
 ---
@@ -1065,14 +1072,13 @@ pnpm build
 ## Immediate open tasks for the coding assistant
 
 1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
-2. Treat Phase 1.5 service catalog and affected services as the recommended next product milestone unless the user explicitly chooses Phase 2 identity first.
-3. Before implementation, confirm the migration/backfill choice for existing development incidents from repository/data context; avoid destructive reset unless explicitly authorized.
-4. Implement services, service-owned environments, and many-to-many incident affected services with organization-scoped database constraints and audited changes.
-5. Add service catalog/detail and environment-management UI, incident affected-service selection/display, and URL-backed dashboard filtering.
-6. Add PostgreSQL integration tests for tenancy/constraints and browser tests for the primary service journeys.
-7. Add or strengthen baseline GitHub Actions CI during this milestone if not already present.
-8. Keep the milestone local and runnable. Do not jump to AWS, queues, AI, Kafka, or on-call before their prerequisites work.
-9. Update this context, README, migration documentation, and roadmap status when the milestone is complete.
+2. Review the completed Phase 1.5 diff with the user, then commit and push it only when explicitly requested.
+3. Begin Phase 2 by documenting the authentication/session choice and a named-action permission matrix before schema/UI implementation.
+4. Add users, organization memberships, team memberships, invitations, roles, sessions/revocation, and actor-aware audit records through a migration and idempotent development seed.
+5. Replace the fixed development tenant with authenticated server-derived organization context and enforce tenant/role authorization across incidents, services, environments, and teams.
+6. Test cross-tenant IDOR attempts, role boundaries, CSRF/session behavior, revoked/disabled users, and invitation flows against real PostgreSQL where appropriate.
+7. Keep the milestone local and runnable. Do not jump to WebSockets, AWS, queues, AI, Kafka, or on-call before their prerequisites work.
+8. Update this context, README, migration documentation, and roadmap status when Phase 2 is complete.
 
 ## Working preferences for the coding assistant
 

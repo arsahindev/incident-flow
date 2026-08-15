@@ -9,11 +9,13 @@ import {
 import type {
   CreateIncidentInput,
   IncidentDetailRecord,
+  IncidentListFilters,
   UpdateIncidentInput,
 } from "./types.js";
 
 const incidentId = "33333333-3333-4333-8333-333333333333";
 const teamId = "22222222-2222-4222-8222-222222222222";
+const serviceId = "55555555-5555-4555-8555-555555555551";
 
 function incidentFixture(): IncidentDetailRecord {
   return {
@@ -23,6 +25,17 @@ function incidentFixture(): IncidentDetailRecord {
     status: "open",
     priority: "high",
     team: { id: teamId, name: "Platform", slug: "platform" },
+    affectedServices: [
+      {
+        id: serviceId,
+        name: "Checkout API",
+        slug: "checkout-api",
+        type: "api",
+        tier: "critical",
+        status: "operational",
+        isPrimary: true,
+      },
+    ],
     resolvedAt: null,
     createdAt: "2026-08-08T12:00:00.000Z",
     updatedAt: "2026-08-08T12:00:00.000Z",
@@ -45,7 +58,10 @@ function createRepository(overrides: Partial<IncidentRepository> = {}) {
       return [{ id: teamId, name: "Platform", slug: "platform" }];
     },
     async listIncidents() {
-      return [incidentFixture()];
+      return {
+        incidents: [incidentFixture()],
+        pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 },
+      };
     },
     async getIncident() {
       return incidentFixture();
@@ -73,6 +89,42 @@ test("incident routes expose the development tenant's teams and incidents", asyn
   assert.equal(teamsResponse.json().teams[0].name, "Platform");
   assert.equal(incidentsResponse.statusCode, 200);
   assert.equal(incidentsResponse.json().incidents[0].id, incidentId);
+  assert.equal(incidentsResponse.json().pagination.total, 1);
+  await app.close();
+});
+
+test("GET /v1/incidents validates and forwards catalog filters and pagination", async () => {
+  let receivedFilters: IncidentListFilters | undefined;
+  const repository = createRepository({
+    async listIncidents(_organizationSlug, filters) {
+      receivedFilters = filters;
+      return {
+        incidents: [incidentFixture()],
+        pagination: { page: 2, pageSize: 10, total: 11, totalPages: 2 },
+      };
+    },
+  });
+  const app = buildApp({ incidentRepository: repository, logger: false });
+
+  const response = await app.inject({
+    method: "GET",
+    url: `/v1/incidents?serviceId=${serviceId}&teamId=${teamId}&status=open&priority=high&page=2&pageSize=10`,
+  });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(receivedFilters, {
+    serviceId,
+    teamId,
+    status: "open",
+    priority: "high",
+    page: 2,
+    pageSize: 10,
+  });
+
+  const invalidResponse = await app.inject({
+    method: "GET",
+    url: "/v1/incidents?serviceId=another-tenant&status=unknown&page=0",
+  });
+  assert.equal(invalidResponse.statusCode, 400);
   await app.close();
 });
 
@@ -96,7 +148,11 @@ test("POST /v1/incidents validates and normalizes its input", async () => {
   const response = await app.inject({
     method: "POST",
     url: "/v1/incidents",
-    payload: { title: "  Checkout API unavailable  ", teamId },
+    payload: {
+      title: "  Checkout API unavailable  ",
+      teamId,
+      serviceIds: [serviceId],
+    },
   });
 
   assert.equal(response.statusCode, 201);
@@ -104,6 +160,7 @@ test("POST /v1/incidents validates and normalizes its input", async () => {
     title: "Checkout API unavailable",
     priority: "medium",
     teamId,
+    serviceIds: [serviceId],
   });
   await app.close();
 });

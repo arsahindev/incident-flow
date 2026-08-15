@@ -2,11 +2,13 @@ import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createPrismaClient } from "./database.js";
 import { PrismaIncidentRepository } from "./incidents/prisma-repository.js";
+import { PrismaServiceRepository } from "./services/prisma-repository.js";
 
 const config = loadConfig();
 const prisma = createPrismaClient(config.DATABASE_URL);
 const app = buildApp({
   incidentRepository: new PrismaIncidentRepository(prisma),
+  serviceRepository: new PrismaServiceRepository(prisma),
   organizationSlug: config.DEVELOPMENT_ORGANIZATION_SLUG,
   webOrigin: config.WEB_ORIGIN,
 });

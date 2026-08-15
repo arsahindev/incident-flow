@@ -10,9 +10,23 @@ export type TeamRecord = {
   slug: string;
 };
 
+export type AffectedServiceRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  type: "application" | "api" | "platform" | "infrastructure" | "business" | "external";
+  tier: "critical" | "high" | "medium" | "low";
+  status: "operational" | "degraded" | "disrupted" | "maintenance";
+  isPrimary: boolean;
+};
+
 export type IncidentActivityRecord = {
   id: string;
-  type: "created" | "status_changed" | "team_assigned";
+  type:
+    | "created"
+    | "status_changed"
+    | "team_assigned"
+    | "affected_services_changed";
   message: string;
   fromValue: string | null;
   toValue: string | null;
@@ -26,6 +40,7 @@ export type IncidentSummaryRecord = {
   status: IncidentStatus;
   priority: IncidentPriority;
   team: TeamRecord | null;
+  affectedServices: AffectedServiceRecord[];
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -40,9 +55,32 @@ export type CreateIncidentInput = {
   description?: string | null;
   priority: IncidentPriority;
   teamId?: string | null;
+  serviceIds: string[];
+  primaryServiceId?: string | null;
 };
 
 export type UpdateIncidentInput = {
   status?: IncidentStatus;
   teamId?: string | null;
+  serviceIds?: string[];
+  primaryServiceId?: string | null;
+};
+
+export type IncidentListFilters = {
+  serviceId?: string;
+  teamId?: string;
+  status?: IncidentStatus;
+  priority?: IncidentPriority;
+  page: number;
+  pageSize: number;
+};
+
+export type IncidentListResult = {
+  incidents: IncidentSummaryRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 };

@@ -14,6 +14,7 @@ import {
 import type {
   CreateIncidentInput,
   IncidentDetailRecord,
+  IncidentListFilters,
   IncidentPriority,
   IncidentStatus,
   IncidentSummaryRecord,
@@ -22,6 +23,21 @@ import type {
 
 const incidentSummaryInclude = {
   team: { select: { id: true, name: true, slug: true } },
+  affectedServices: {
+    orderBy: [{ isPrimary: "desc" as const }, { createdAt: "asc" as const }],
+    include: {
+      service: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          type: true,
+          tier: true,
+          status: true,
+        },
+      },
+    },
+  },
 } satisfies Prisma.IncidentInclude;
 
 const incidentDetailInclude = {
@@ -65,6 +81,15 @@ function toSummary(incident: PrismaIncidentSummary): IncidentSummaryRecord {
     status: fromPrismaStatus(incident.status),
     priority: fromPrismaPriority(incident.priority),
     team: incident.team,
+    affectedServices: incident.affectedServices.map((affected) => ({
+      id: affected.service.id,
+      name: affected.service.name,
+      slug: affected.service.slug,
+      type: affected.service.type.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["type"],
+      tier: affected.service.tier.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["tier"],
+      status: affected.service.status.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["status"],
+      isPrimary: affected.isPrimary,
+    })),
     resolvedAt: incident.resolvedAt?.toISOString() ?? null,
     createdAt: incident.createdAt.toISOString(),
     updatedAt: incident.updatedAt.toISOString(),
@@ -96,14 +121,36 @@ export class PrismaIncidentRepository implements IncidentRepository {
     });
   }
 
-  async listIncidents(organizationSlug: string) {
-    const incidents = await this.prisma.incident.findMany({
-      where: { organization: { slug: organizationSlug } },
-      include: incidentSummaryInclude,
-      orderBy: { createdAt: "desc" },
-    });
+  async listIncidents(organizationSlug: string, filters: IncidentListFilters) {
+    const where = {
+      organization: { slug: organizationSlug },
+      teamId: filters.teamId,
+      status: filters.status ? statusToPrisma[filters.status] : undefined,
+      priority: filters.priority ? priorityToPrisma[filters.priority] : undefined,
+      affectedServices: filters.serviceId
+        ? { some: { serviceId: filters.serviceId } }
+        : undefined,
+    } satisfies Prisma.IncidentWhereInput;
+    const [incidents, total] = await this.prisma.$transaction([
+      this.prisma.incident.findMany({
+        where,
+        include: incidentSummaryInclude,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+      }),
+      this.prisma.incident.count({ where }),
+    ]);
 
-    return incidents.map(toSummary);
+    return {
+      incidents: incidents.map(toSummary),
+      pagination: {
+        page: filters.page,
+        pageSize: filters.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / filters.pageSize)),
+      },
+    };
   }
 
   async getIncident(organizationSlug: string, incidentId: string) {
@@ -135,6 +182,12 @@ export class PrismaIncidentRepository implements IncidentRepository {
         : null;
       if (input.teamId && !team) throw new ResourceNotFoundError("Team");
 
+      const services = await this.getAffectedServices(
+        transaction,
+        organization.id,
+        input.serviceIds,
+      );
+
       const incident = await transaction.incident.create({
         data: {
           organizationId: organization.id,
@@ -143,6 +196,15 @@ export class PrismaIncidentRepository implements IncidentRepository {
           description: input.description || null,
           priority: priorityToPrisma[input.priority],
         },
+      });
+
+      await transaction.incidentAffectedService.createMany({
+        data: services.map((service) => ({
+          organizationId: organization.id,
+          incidentId: incident.id,
+          serviceId: service.id,
+          isPrimary: service.id === (input.primaryServiceId ?? services[0]?.id),
+        })),
       });
 
       await transaction.incidentActivity.create({
@@ -166,6 +228,16 @@ export class PrismaIncidentRepository implements IncidentRepository {
           },
         });
       }
+
+      await transaction.incidentActivity.create({
+        data: {
+          organizationId: organization.id,
+          incidentId: incident.id,
+          type: "AFFECTED_SERVICES_CHANGED",
+          message: `Affected services set to ${services.map((service) => service.name).join(", ")}; primary: ${services.find((service) => service.id === (input.primaryServiceId ?? services[0]?.id))?.name}`,
+          toValue: JSON.stringify(services.map((service) => service.id)),
+        },
+      });
 
       return this.getIncidentInTransaction(
         transaction,
@@ -233,6 +305,53 @@ export class PrismaIncidentRepository implements IncidentRepository {
         });
       }
 
+      if (input.serviceIds !== undefined) {
+        const nextServices = await this.getAffectedServices(
+          transaction,
+          existing.organizationId,
+          input.serviceIds,
+        );
+        const currentServiceIds = existing.affectedServices.map(
+          (affected) => affected.serviceId,
+        );
+        const nextServiceIds = nextServices.map((service) => service.id);
+        const currentPrimaryId = existing.affectedServices.find(
+          (affected) => affected.isPrimary,
+        )?.serviceId;
+        const nextPrimaryId = input.primaryServiceId ?? nextServices[0]?.id;
+        const servicesChanged =
+          currentPrimaryId !== nextPrimaryId ||
+          currentServiceIds.length !== nextServiceIds.length ||
+          currentServiceIds.some((id) => !nextServiceIds.includes(id));
+
+        if (servicesChanged) {
+          await transaction.incidentAffectedService.deleteMany({
+            where: {
+              organizationId: existing.organizationId,
+              incidentId,
+            },
+          });
+          await transaction.incidentAffectedService.createMany({
+            data: nextServices.map((service) => ({
+              organizationId: existing.organizationId,
+              incidentId,
+              serviceId: service.id,
+              isPrimary: service.id === nextPrimaryId,
+            })),
+          });
+          activity.push({
+            organizationId: existing.organizationId,
+            incidentId,
+            type: "AFFECTED_SERVICES_CHANGED",
+            message: `Affected services changed to ${nextServices
+              .map((service) => service.name)
+              .join(", ")}; primary: ${nextServices.find((service) => service.id === nextPrimaryId)?.name}`,
+            fromValue: JSON.stringify(currentServiceIds),
+            toValue: JSON.stringify(nextServiceIds),
+          });
+        }
+      }
+
       await transaction.incident.update({
         where: {
           organizationId_id: {
@@ -274,5 +393,29 @@ export class PrismaIncidentRepository implements IncidentRepository {
       include: incidentDetailInclude,
     });
     return toDetail(incident);
+  }
+
+  private async getAffectedServices(
+    transaction: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
+    organizationId: string,
+    serviceIds: string[],
+  ) {
+    const uniqueServiceIds = [...new Set(serviceIds)];
+    if (uniqueServiceIds.length !== serviceIds.length) {
+      throw new ResourceNotFoundError("Affected service");
+    }
+    const services = await transaction.service.findMany({
+      where: {
+        organizationId,
+        id: { in: uniqueServiceIds },
+        archivedAt: null,
+      },
+      select: { id: true, name: true },
+    });
+    if (services.length !== uniqueServiceIds.length) {
+      throw new ResourceNotFoundError("Affected service");
+    }
+    const serviceById = new Map(services.map((service) => [service.id, service]));
+    return uniqueServiceIds.map((id) => serviceById.get(id)!);
   }
 }
