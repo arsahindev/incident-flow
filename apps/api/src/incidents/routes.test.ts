@@ -1,0 +1,146 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { buildApp } from "../app.js";
+import {
+  ResourceNotFoundError,
+  type IncidentRepository,
+} from "./repository.js";
+import type {
+  CreateIncidentInput,
+  IncidentDetailRecord,
+  UpdateIncidentInput,
+} from "./types.js";
+
+const incidentId = "33333333-3333-4333-8333-333333333333";
+const teamId = "22222222-2222-4222-8222-222222222222";
+
+function incidentFixture(): IncidentDetailRecord {
+  return {
+    id: incidentId,
+    title: "Checkout API unavailable",
+    description: "Requests are returning HTTP 503.",
+    status: "open",
+    priority: "high",
+    team: { id: teamId, name: "Platform", slug: "platform" },
+    resolvedAt: null,
+    createdAt: "2026-08-08T12:00:00.000Z",
+    updatedAt: "2026-08-08T12:00:00.000Z",
+    activity: [
+      {
+        id: "44444444-4444-4444-8444-444444444444",
+        type: "created",
+        message: "Incident created with High priority",
+        fromValue: null,
+        toValue: "high",
+        createdAt: "2026-08-08T12:00:00.000Z",
+      },
+    ],
+  };
+}
+
+function createRepository(overrides: Partial<IncidentRepository> = {}) {
+  const repository: IncidentRepository = {
+    async listTeams() {
+      return [{ id: teamId, name: "Platform", slug: "platform" }];
+    },
+    async listIncidents() {
+      return [incidentFixture()];
+    },
+    async getIncident() {
+      return incidentFixture();
+    },
+    async createIncident(_organizationSlug, input) {
+      return { ...incidentFixture(), ...input, description: input.description ?? null };
+    },
+    async updateIncident(_organizationSlug, _incidentId, input) {
+      return { ...incidentFixture(), ...input };
+    },
+    ...overrides,
+  };
+  return repository;
+}
+
+test("incident routes expose the development tenant's teams and incidents", async () => {
+  const app = buildApp({ incidentRepository: createRepository(), logger: false });
+
+  const [teamsResponse, incidentsResponse] = await Promise.all([
+    app.inject({ method: "GET", url: "/v1/teams" }),
+    app.inject({ method: "GET", url: "/v1/incidents" }),
+  ]);
+
+  assert.equal(teamsResponse.statusCode, 200);
+  assert.equal(teamsResponse.json().teams[0].name, "Platform");
+  assert.equal(incidentsResponse.statusCode, 200);
+  assert.equal(incidentsResponse.json().incidents[0].id, incidentId);
+  await app.close();
+});
+
+test("POST /v1/incidents validates and normalizes its input", async () => {
+  let receivedInput: CreateIncidentInput | undefined;
+  const repository = createRepository({
+    async createIncident(_organizationSlug, input) {
+      receivedInput = input;
+      return incidentFixture();
+    },
+  });
+  const app = buildApp({ incidentRepository: repository, logger: false });
+
+  const invalidResponse = await app.inject({
+    method: "POST",
+    url: "/v1/incidents",
+    payload: { title: "x" },
+  });
+  assert.equal(invalidResponse.statusCode, 400);
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/incidents",
+    payload: { title: "  Checkout API unavailable  ", teamId },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(receivedInput, {
+    title: "Checkout API unavailable",
+    priority: "medium",
+    teamId,
+  });
+  await app.close();
+});
+
+test("PATCH /v1/incidents/:id accepts lifecycle changes and maps missing records", async () => {
+  let receivedInput: UpdateIncidentInput | undefined;
+  const repository = createRepository({
+    async updateIncident(_organizationSlug, _incidentId, input) {
+      receivedInput = input;
+      return { ...incidentFixture(), status: input.status ?? "open" };
+    },
+  });
+  const app = buildApp({ incidentRepository: repository, logger: false });
+
+  const response = await app.inject({
+    method: "PATCH",
+    url: `/v1/incidents/${incidentId}`,
+    payload: { status: "acknowledged" },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(receivedInput, { status: "acknowledged" });
+
+  const missingApp = buildApp({
+    logger: false,
+    incidentRepository: createRepository({
+      async getIncident() {
+        throw new ResourceNotFoundError("Incident");
+      },
+    }),
+  });
+  const missingResponse = await missingApp.inject({
+    method: "GET",
+    url: `/v1/incidents/${incidentId}`,
+  });
+  assert.equal(missingResponse.statusCode, 404);
+  assert.deepEqual(missingResponse.json(), { error: "Incident was not found" });
+
+  await app.close();
+  await missingApp.close();
+});

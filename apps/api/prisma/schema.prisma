@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IncidentStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum IncidentPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentActivityType {
+  CREATED
+  STATUS_CHANGED
+  TEAM_ASSIGNED
+}
+
+model Organization {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String             @unique
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+  teams     Team[]
+  incidents Incident[]
+  activity  IncidentActivity[]
+
+  @@map("organizations")
+}
+
+model Team {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  name           String
+  slug           String
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incidents      Incident[]
+
+  @@unique([organizationId, slug])
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@map("teams")
+}
+
+model Incident {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  teamId         String?            @map("team_id") @db.Uuid
+  title          String
+  description    String?
+  status         IncidentStatus     @default(OPEN)
+  priority       IncidentPriority   @default(MEDIUM)
+  resolvedAt     DateTime?          @map("resolved_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team           Team?              @relation(fields: [organizationId, teamId], references: [organizationId, id], onDelete: Restrict)
+  activity       IncidentActivity[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@map("incidents")
+}
+
+model IncidentActivity {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  incidentId     String               @map("incident_id") @db.Uuid
+  type           IncidentActivityType
+  message        String
+  fromValue      String?              @map("from_value")
+  toValue        String?              @map("to_value")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incident       Incident             @relation(fields: [organizationId, incidentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([organizationId, incidentId, createdAt])
+  @@map("incident_activity")
+}
