@@ -24,17 +24,58 @@ enum IncidentActivityType {
   CREATED
   STATUS_CHANGED
   TEAM_ASSIGNED
+  AFFECTED_SERVICES_CHANGED
+}
+
+enum ServiceType {
+  APPLICATION
+  API
+  PLATFORM
+  INFRASTRUCTURE
+  BUSINESS
+  EXTERNAL
+}
+
+enum ServiceTier {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ServiceStatus {
+  OPERATIONAL
+  DEGRADED
+  DISRUPTED
+  MAINTENANCE
+}
+
+enum ServiceEnvironmentKind {
+  DEVELOPMENT
+  TEST
+  STAGING
+  PRODUCTION
+  PREVIEW
+  OTHER
+}
+
+enum ServiceEnvironmentStatus {
+  ACTIVE
+  ARCHIVED
 }
 
 model Organization {
-  id        String             @id @default(uuid()) @db.Uuid
-  name      String
-  slug      String             @unique
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
-  teams     Team[]
-  incidents Incident[]
-  activity  IncidentActivity[]
+  id                  String                    @id @default(uuid()) @db.Uuid
+  name                String
+  slug                String                    @unique
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+  teams               Team[]
+  services            Service[]
+  serviceEnvironments ServiceEnvironment[]
+  incidents           Incident[]
+  affectedServices    IncidentAffectedService[]
+  activity            IncidentActivity[]
 
   @@map("organizations")
 }
@@ -48,6 +89,7 @@ model Team {
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   incidents      Incident[]
+  ownedServices  Service[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
@@ -56,24 +98,89 @@ model Team {
 }
 
 model Incident {
-  id             String             @id @default(uuid()) @db.Uuid
-  organizationId String             @map("organization_id") @db.Uuid
-  teamId         String?            @map("team_id") @db.Uuid
-  title          String
-  description    String?
-  status         IncidentStatus     @default(OPEN)
-  priority       IncidentPriority   @default(MEDIUM)
-  resolvedAt     DateTime?          @map("resolved_at")
-  createdAt      DateTime           @default(now()) @map("created_at")
-  updatedAt      DateTime           @updatedAt @map("updated_at")
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  team           Team?              @relation(fields: [organizationId, teamId], references: [organizationId, id], onDelete: Restrict)
-  activity       IncidentActivity[]
+  id               String                    @id @default(uuid()) @db.Uuid
+  organizationId   String                    @map("organization_id") @db.Uuid
+  teamId           String?                   @map("team_id") @db.Uuid
+  title            String
+  description      String?
+  status           IncidentStatus            @default(OPEN)
+  priority         IncidentPriority          @default(MEDIUM)
+  resolvedAt       DateTime?                 @map("resolved_at")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team             Team?                     @relation(fields: [organizationId, teamId], references: [organizationId, id], onDelete: Restrict)
+  activity         IncidentActivity[]
+  affectedServices IncidentAffectedService[]
 
   @@unique([organizationId, id])
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
   @@map("incidents")
+}
+
+model Service {
+  id                String                    @id @default(uuid()) @db.Uuid
+  organizationId    String                    @map("organization_id") @db.Uuid
+  ownerTeamId       String?                   @map("owner_team_id") @db.Uuid
+  name              String
+  slug              String
+  description       String?
+  type              ServiceType
+  tier              ServiceTier               @default(MEDIUM)
+  status            ServiceStatus             @default(OPERATIONAL)
+  archivedAt        DateTime?                 @map("archived_at")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerTeam         Team?                     @relation(fields: [organizationId, ownerTeamId], references: [organizationId, id], onDelete: Restrict)
+  environments      ServiceEnvironment[]
+  affectedIncidents IncidentAffectedService[]
+
+  @@unique([organizationId, slug])
+  @@unique([organizationId, id])
+  @@index([organizationId, archivedAt, name])
+  @@index([organizationId, ownerTeamId])
+  @@map("services")
+}
+
+model ServiceEnvironment {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  serviceId      String                   @map("service_id") @db.Uuid
+  name           String
+  slug           String
+  kind           ServiceEnvironmentKind
+  isEphemeral    Boolean                  @default(false) @map("is_ephemeral")
+  /// PostgreSQL also enforces that only ephemeral environments may have an expiry.
+  expiresAt      DateTime?                @map("expires_at")
+  status         ServiceEnvironmentStatus @default(ACTIVE)
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  service        Service                  @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, serviceId, slug])
+  @@index([organizationId, serviceId, status])
+  @@index([organizationId, expiresAt])
+  @@map("service_environments")
+}
+
+model IncidentAffectedService {
+  organizationId String       @map("organization_id") @db.Uuid
+  incidentId     String       @map("incident_id") @db.Uuid
+  serviceId      String       @map("service_id") @db.Uuid
+  isPrimary      Boolean      @default(false) @map("is_primary")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incident       Incident     @relation(fields: [organizationId, incidentId], references: [organizationId, id], onDelete: Cascade)
+  service        Service      @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([incidentId, serviceId])
+  @@index([organizationId, serviceId, createdAt])
+  @@index([organizationId, incidentId])
+  @@map("incident_affected_services")
 }
 
 model IncidentActivity {

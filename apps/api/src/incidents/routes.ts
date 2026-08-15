@@ -5,6 +5,7 @@ import type { IncidentRepository } from "./repository.js";
 import {
   createIncidentSchema,
   incidentIdParamsSchema,
+  listIncidentsQuerySchema,
   updateIncidentSchema,
 } from "./schemas.js";
 
@@ -33,9 +34,11 @@ export async function registerIncidentRoutes(
     teams: await repository.listTeams(organizationSlug),
   }));
 
-  app.get("/v1/incidents", async () => ({
-    incidents: await repository.listIncidents(organizationSlug),
-  }));
+  app.get("/v1/incidents", async (request, reply) => {
+    const query = listIncidentsQuerySchema.safeParse(request.query);
+    if (!query.success) return sendValidationError(reply, query.error);
+    return repository.listIncidents(organizationSlug, query.data);
+  });
 
   app.post("/v1/incidents", async (request, reply) => {
     const parsed = createIncidentSchema.safeParse(request.body);

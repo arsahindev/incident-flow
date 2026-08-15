@@ -2,15 +2,18 @@
 
 IncidentFlow is a multi-tenant incident intake, routing, notification, and response-coordination SaaS for backend teams. It is being built as a production-minded full-stack portfolio project, one working vertical slice at a time.
 
-## Current milestone: Phase 1
+## Current milestone: Phase 1.5
 
-The first product vertical slice is working locally:
+The manual incident lifecycle and service-catalog foundation are working locally:
 
 - a pnpm monorepo;
-- a Next.js dashboard with incident creation, listing, detail, and lifecycle controls;
-- a validated Fastify API for teams and incidents;
-- Prisma migrations and a seeded development organization/team;
-- Transactional incident activity history for creation, assignment, and status changes;
+- a Next.js dashboard with incident creation, listing, detail, lifecycle controls, and URL-backed filters;
+- a service catalog with service-owned environments, ownership, criticality tiers, and operational status;
+- many-to-many affected-service links with one primary service per newly created incident;
+- validated Fastify APIs for teams, services, environments, and incidents;
+- Prisma migrations and an idempotent seed with a development organization, team, and realistic service catalog;
+- transactional incident activity history for creation, assignment, status, and affected-service changes;
+- PostgreSQL constraint tests and a GitHub Actions quality pipeline;
 - PostgreSQL in Docker Compose with a persistent named volume.
 
 Authentication, WebSockets, queues, AWS resources, and AI are intentionally deferred to their roadmap phases.
@@ -50,8 +53,12 @@ pnpm --filter @incidentflow/api dev
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:integration
 pnpm build
+pnpm audit --prod --audit-level high
 ```
+
+`pnpm test:integration` requires the local PostgreSQL container. The unit-test command skips those database-backed cases so it remains fast and self-contained.
 
 ## Database lifecycle
 
@@ -67,7 +74,7 @@ Create and apply a development migration after editing the Prisma schema:
 pnpm db:migrate --name describe_your_change
 ```
 
-The seed command is idempotent and can safely restore the development organization and Platform team:
+The seed command is idempotent and can safely restore the development organization, Platform team, services, and service environments:
 
 ```bash
 pnpm db:seed

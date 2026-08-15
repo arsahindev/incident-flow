@@ -13,6 +13,7 @@
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
+    "test:integration": "pnpm --filter @incidentflow/api test:integration",
     "db:migrate": "pnpm --filter @incidentflow/api db:migrate",
     "db:seed": "pnpm --filter @incidentflow/api db:seed",
     "db:studio": "pnpm --filter @incidentflow/api db:studio"

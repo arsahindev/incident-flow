@@ -3,7 +3,8 @@ import type {
   IncidentDetailRecord,
   IncidentPriority,
   IncidentStatus,
-  IncidentSummaryRecord,
+  IncidentListFilters,
+  IncidentListResult,
   TeamRecord,
   UpdateIncidentInput,
 } from "./types.js";
@@ -15,9 +16,19 @@ export class ResourceNotFoundError extends Error {
   }
 }
 
+export class ResourceConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ResourceConflictError";
+  }
+}
+
 export interface IncidentRepository {
   listTeams(organizationSlug: string): Promise<TeamRecord[]>;
-  listIncidents(organizationSlug: string): Promise<IncidentSummaryRecord[]>;
+  listIncidents(
+    organizationSlug: string,
+    filters: IncidentListFilters,
+  ): Promise<IncidentListResult>;
   getIncident(
     organizationSlug: string,
     incidentId: string,
