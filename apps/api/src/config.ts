@@ -8,10 +8,8 @@ loadEnvironmentFile({ path: resolve(process.cwd(), "../../.env"), quiet: true })
 const environmentSchema = z.object({
   API_HOST: z.string().default("0.0.0.0"),
   API_PORT: z.coerce.number().int().positive().max(65_535).default(4000),
-  WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
-  DATABASE_URL: z
-    .string()
-    .url()
+  WEB_ORIGIN: z.url().default("http://localhost:3000"),
+  DATABASE_URL: z.url()
     .default(
       "postgresql://incidentflow:incidentflow_dev@localhost:5432/incidentflow",
     ),

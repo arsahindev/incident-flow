@@ -2,7 +2,7 @@
 
 ## Purpose of this document
 
-This document captures the decisions made before implementation so a coding assistant can continue the project without rediscovering the product scope or architecture. Treat it as the working design authority until a decision is deliberately changed.
+This document captures product, domain, architecture, reliability, and implementation decisions so a coding assistant can continue the project without rediscovering its intent. Treat it as the working design authority until a decision is deliberately changed. Keep it current when a milestone changes the product model or architecture; do not let the handoff drift behind the actual repository.
 
 ## Owner and portfolio goal
 
@@ -20,26 +20,52 @@ IncidentFlow is intentionally a serious portfolio project. It should demonstrate
 
 The project must be built iteratively. Avoid adding cloud services or advanced architecture before the preceding user-facing product milestone works locally.
 
+### Portfolio quality bar
+
+The product should make a potential employer believe Ali can design, build, operate, secure, and evolve a real SaaS system. A feature is not portfolio-ready merely because its happy path works. Relevant milestones should demonstrate:
+
+- deliberate multi-tenant data isolation and server-side authorization;
+- validated API contracts and explicit domain boundaries;
+- migrations, constraints, indexes, transactions, and auditable state transitions;
+- unit, integration, contract, and selected end-to-end tests;
+- idempotency, retries, timeouts, backoff, leases, DLQs, and replay tooling where asynchronous work exists;
+- structured logs, correlation IDs, metrics, traces, dashboards, health/readiness checks, and actionable alerts;
+- secrets management, rate limiting, input limits, SSRF defenses, dependency scanning, and least-privilege IAM;
+- operational tooling for failed work, delivery history, incident history, retention, and recovery;
+- CI quality gates, reproducible environments, infrastructure as code, deployment safety, and rollback/runbooks;
+- honest documentation of guarantees, tradeoffs, failure modes, and deliberately deferred scale.
+
+Production-ready does **not** mean adding every enterprise feature. It means implementing a coherent scope deeply, testing failure paths, making it operable, and avoiding claims the system cannot support.
+
 ---
 
 ## Product definition
 
-**IncidentFlow is a multi-tenant incident intake, routing, notification, and response-coordination SaaS for backend teams.**
+**IncidentFlow is a multi-tenant alert intake, incident routing, notification, and response-coordination SaaS for engineering and operations teams.**
 
-It is intentionally closer to the incident-management/alerting side of Jira Service Management or Opsgenie than to New Relic.
+Opsgenie is the clearest product-category reference. IncidentFlow should demonstrate the core concepts that make an Opsgenie-class product technically interesting: services, alerts/events, rules and deduplication, incident coordination, ownership, responders, notifications, audit history, reliability, and later bounded on-call/escalation behavior. It is not intended to copy Atlassian’s proprietary UI or become a drop-in feature-complete clone.
+
+Jira Service Management is a secondary reference for IT service-management workflows, service catalogs, major incidents, SLAs, stakeholder communication, problems, changes, and post-incident reviews. IncidentFlow is not a general-purpose Jira project or ticket tracker.
 
 ### In scope
 
 - Organizations, users, teams, roles, and authorization.
+- An organization-wide service catalog representing applications, APIs, platforms, infrastructure, business capabilities, and external dependencies.
+- Service ownership, criticality tiers, operational status, service-specific environments, and later service dependencies.
+- First-class alerts normalized from manual/API/integration events, with acknowledgement, ownership, deduplication, history, and closure.
+- Incidents created manually or from one or more alerts; alerts do not automatically imply a service-disrupting incident.
+- Incidents associated with one or more affected services and filterable by service/team/status/priority.
 - Manual incident creation and management.
 - Source integrations that receive signed error/alert webhooks.
-- Declarative, user-configured rules that decide whether incoming events create incidents.
+- Declarative, user-configured rules that normalize and route incoming events into alerts and may explicitly create or link incidents from those alerts.
 - Dedupe/grouping of incoming alerts.
 - Inbound event audit history and processing status.
 - S3-backed attachments.
 - Asynchronous work through SNS, SQS, workers, retry policies, and DLQs.
 - Real-time in-app dashboard updates through WebSockets.
 - Email and outbound webhook notifications.
+- Major-incident coordination, responders, stakeholders, service-level targets, and post-incident learning in later phases.
+- A deliberately bounded on-call schedule and escalation-policy capability after notification delivery is reliable.
 - AI-generated incident briefs, always reviewed by a human before any action.
 - Docker development workflow, CloudFormation infrastructure, and GitHub Actions CI/CD.
 
@@ -48,12 +74,94 @@ It is intentionally closer to the incident-management/alerting side of Jira Serv
 - Application performance monitoring (APM), profiling, or building a New Relic clone.
 - Collecting raw metrics, logs, distributed traces, or high-cardinality time-series data.
 - Building an observability agent or a broad analytics/query platform.
-- PagerDuty-scale escalation scheduling.
+- A general-purpose project-management/issue-tracking product or a clone of Jira Software.
+- A full enterprise CMDB in the initial product; the service catalog begins deliberately small.
+- Multi-service source-integration credentials. Each initial integration is intentionally scoped to one service environment; centralized providers use separate integration records.
+- PagerDuty/Opsgenie-scale global telephony, scheduling, and escalation infrastructure in the initial product. A smaller, well-tested on-call model may be built later.
 - A large collection of third-party integrations in the initial product.
 
 ### Why this scope
 
 New Relic-like observability is much larger: it requires agents, log/metric/trace ingestion, very high-volume data storage, indexing, query engines, dashboards, retention policies, and profiling. IncidentFlow receives already-detected alert/error events and coordinates a response. This is substantial but realistically buildable.
+
+### Domain terminology: services, applications, projects, and teams
+
+Use **service** as the primary operational entity, not `project` or `application`:
+
+- A **service** is something that delivers value or capability and can be affected by an incident: `checkout-api`, `payment-processing`, `customer-portal`, `mobile-app`, `postgres-primary`, or `stripe`.
+- An **application** is one possible service type. The word is too narrow for databases, infrastructure, platforms, business capabilities, and third-party dependencies.
+- A **project** usually means a temporary body of work or a Jira-style workspace. Do not use it for the system affected by an incident. Add projects only if IncidentFlow later needs administrative workspaces distinct from services.
+- A **team** answers “who normally owns or responds?” A service answers “what is affected?” An incident may be coordinated by a team other than the affected service’s normal owner.
+- An **incident** may affect multiple services. Model this with an `incident_affected_services` join table rather than a single `service_id` column. A relation may later mark one affected service as primary without losing the many-to-many model.
+
+The first service-catalog version should include:
+
+```text
+services
+  id
+  organization_id
+  owner_team_id (nullable while onboarding)
+  name
+  slug
+  description
+  type (application, api, platform, infrastructure, business, external)
+  tier (critical, high, medium, low)
+  status (operational, degraded, disrupted, maintenance)
+  created_at
+  updated_at
+
+service_environments
+  id
+  organization_id
+  service_id
+  name
+  kind (development, test, staging, production, preview, other)
+  is_ephemeral
+  expires_at (nullable)
+  status (active, archived)
+  created_at
+  updated_at
+
+incident_affected_services
+  organization_id
+  incident_id
+  service_id
+  is_primary
+  created_at
+```
+
+Use composite organization-scoped foreign keys/unique constraints so an incident cannot reference another tenant’s service. Do not automatically derive incident priority from service tier in the first version; make that a later explicit rule so the behavior is visible and configurable.
+
+Environments belong to services, not directly to organizations. An organization may use common names such as development, test, staging, and production across its catalog, while an individual service may also define preview or feature-branch environments. Creating another environment must not create another service. Ephemeral environments may have an expiry/archive lifecycle so the catalog does not grow forever.
+
+Keep these operational records distinct:
+
+- An **event** is an immutable observation received from an integration or internal producer. It is retained for audit/idempotency and may be ignored, rejected, or folded into an alert.
+- An **alert** is an actionable, deduplicated signal for responders. Repeated matching events append evidence and update aggregate counters/timestamps on one alert; an alert can be acknowledged, assigned, snoozed later, and closed without declaring a service incident.
+- An **incident** coordinates restoration and communication for an actual or suspected service disruption. It may be created manually or linked to one or more alerts and may affect multiple services.
+- A **notification/delivery** is an attempt to tell a person or external system about an alert or incident; it is not the alert itself.
+
+Events do not directly create incidents. Event processing creates a new alert or deduplicates the event into an existing alert. A responder or an explicit automation rule may then create an incident and link the relevant alert, or link the alert to an existing incident.
+
+Preserve these relationships through explicit join tables:
+
+```text
+alert_events
+  organization_id
+  alert_id
+  received_event_id
+  associated_at
+
+incident_alerts
+  organization_id
+  incident_id
+  alert_id
+  linked_at
+  linked_by_user_id (nullable)
+  linked_by_rule_id (nullable)
+```
+
+`alert_events` preserves which immutable observations contributed to an alert. `incident_alerts` supports grouping related alerts into an incident without losing each alert's source, deduplication history, or independent lifecycle. Manual and automated linking/unlinking must be auditable. In the first implementation, one received event normally contributes to one alert, but the join-table model keeps lineage explicit and avoids embedding incident references in raw event records.
 
 ---
 
@@ -62,23 +170,36 @@ New Relic-like observability is much larger: it requires agents, log/metric/trac
 ### 1. Manual incident lifecycle — first vertical slice
 
 1. A user signs in (initially a seeded development organization may be used before authentication is built).
-2. The user creates an incident.
+2. The user creates an incident and identifies priority, owning/coordinating team, and affected service(s) as those capabilities become available.
 3. The incident is persisted in PostgreSQL.
 4. The dashboard lists the incident and shows its detail page/activity timeline.
 5. A user changes its status or assignment and the timeline records that action.
 
 **First milestone:** A user can create, persist, display, and update an incident locally; the data survives a PostgreSQL container restart.
 
-### 2. Inbound source webhook lifecycle
+### 2. Service catalog and affected-service lifecycle
+
+1. An organization creates a service such as Checkout API, Payment Processing, Customer Portal, or Stripe.
+2. The service has a type, criticality tier, and owning team.
+3. A user selects one or more affected services when creating or updating an incident.
+4. The incident detail shows affected services and ownership context.
+5. The dashboard can filter incidents by affected service and show service-specific incident history.
+6. Later, integrations belong to a specific service environment, and service relationships reveal potentially affected upstream/downstream systems.
+
+**Service-catalog milestone:** An organization can model what it operates, associate multiple affected services with an incident, and answer “which incidents affected this service?” without confusing services with teams or projects.
+
+### 3. Inbound source webhook lifecycle
 
 1. An organization creates a source integration in the dashboard.
-2. IncidentFlow presents a unique endpoint and secret, e.g. `POST /v1/ingest/:integrationKey`.
-3. The customer API, a demo service, or eventually `@incidentflow/node` sends a signed error event over HTTPS.
-4. IncidentFlow verifies the request, records it, and responds quickly with `202 Accepted`.
-5. IncidentFlow queues processing asynchronously.
-6. A worker evaluates the organization’s declarative rule and deduplication logic.
-7. The worker creates or updates an incident and emits domain events.
-8. Connected browser users receive a real-time UI update; notifications are sent asynchronously.
+2. The integration is bound to exactly one service environment in the initial model. A service environment may have several integrations because several trusted tools may observe it.
+3. IncidentFlow presents an opaque public integration key in a unique endpoint plus a separate signing secret shown once, e.g. `POST /v1/events/:integrationKey`.
+4. The customer API, a demo service, or eventually `@incidentflow/node` sends a signed error event over HTTPS.
+5. IncidentFlow verifies the request, records it, and responds quickly with `202 Accepted`.
+6. IncidentFlow queues processing asynchronously.
+7. A worker evaluates the organization’s declarative rules, service mapping, and alert deduplication/grouping key.
+8. The worker creates an alert or deduplicates the event into an existing alert, preserving the event as evidence and updating the alert's occurrence count and last-seen timestamp.
+9. An explicit rule or responder action may create an incident and link the alert, or link it to an existing incident, when service-restoration coordination is warranted.
+10. Connected browser users receive a real-time UI update; notifications are sent asynchronously.
 
 Example input event:
 
@@ -86,8 +207,6 @@ Example input event:
 {
   "eventId": "evt_01HXYZ",
   "occurredAt": "2026-08-05T12:00:00Z",
-  "service": "checkout-api",
-  "environment": "production",
   "error": {
     "code": "PAYMENT_PROVIDER_TIMEOUT",
     "message": "Payment provider did not respond within 10 seconds",
@@ -100,7 +219,9 @@ Example input event:
 }
 ```
 
-### 3. Outbound webhook lifecycle
+The integration record—not untrusted payload fields—is authoritative for organization, service, and environment. A payload may echo service/environment as assertions for readability, but if present they must match the integration configuration or be rejected.
+
+### 4. Outbound webhook lifecycle
 
 1. A customer configures an outgoing webhook subscription in IncidentFlow.
 2. They provide a destination URL and selected event types, e.g. `incident.created`, `incident.resolved`, or `ai_brief.completed`.
@@ -109,6 +230,19 @@ Example input event:
 5. Failed deliveries retry with exponential backoff and appear in delivery history.
 
 This is deliberately a separate capability from inbound webhook ingestion.
+
+### 5. Major-incident and stakeholder lifecycle — later phase
+
+1. A high-impact incident is declared a major incident manually or by an explicit rule.
+2. A coordinator/incident commander, responders, and affected services are visible.
+3. Internal responders see the operational timeline; stakeholders receive curated updates rather than every technical event.
+4. Acknowledgement, mitigation, restoration, resolution, and closure timestamps are recorded distinctly.
+5. Service-level targets show whether acknowledgement and restoration are on track or breached.
+6. Resolution requires a summary and suitable closure information; a closed incident may be reopened with an audited reason.
+7. A post-incident review records impact, contributing factors, lessons, and follow-up actions.
+8. Recurring or root-cause work can link the incident to a problem record; a risky remediation can link to a change record.
+
+This journey is intentionally later than reliable intake, persistence, event processing, and notification delivery. Do not build a ceremonial ITIL form before the operational foundations work.
 
 ---
 
@@ -130,6 +264,53 @@ Server POSTs result to callback URL
 ```
 
 For IncidentFlow, prefer separately configured outbound webhook subscriptions over arbitrary callback URLs per request. This makes ownership verification, signatures, retries, delivery history, and SSRF protection practical.
+
+### Source integration model
+
+A source **integration** is not a service and is not a pull subscription. It is the organization-owned credential and configuration boundary that authorizes a particular external sender—such as an application, Datadog monitor, Grafana, Prometheus Alertmanager, or custom script—to push events about one configured service environment.
+
+Initial ownership hierarchy:
+
+```text
+organization
+  └── service
+        └── service environment
+              └── one or more source integrations
+                    └── received events
+```
+
+An external sender cannot use public ingestion without an active integration. Manual alert/incident creation inside the authenticated application is a separate path and does not require a source integration.
+
+Suggested initial fields:
+
+```text
+integrations
+  id
+  organization_id
+  service_environment_id
+  name
+  type
+  public_integration_key
+  encrypted_signing_secret
+  status
+  created_at
+  last_used_at
+  revoked_at
+```
+
+Each integration initially belongs to exactly one service environment. This provides explicit attribution, separate credentials, revocation, audit history, and rate limits without forcing users to create separate services for development/staging/production. The same service environment may have multiple integrations when multiple tools observe it.
+
+Multi-service integration credentials are not planned. A centralized provider that observes several services uses separate IncidentFlow integration records for each service environment. This keeps attribution, credentials, revocation, quotas, and blast radius isolated. A future product decision may deliberately revisit this only if measured customer configuration burden justifies the mapping and security complexity; do not preserve speculative schema for it now.
+
+Provisioning flow:
+
+1. An organization admin selects a service and one of its environments, then creates an integration.
+2. IncidentFlow generates an opaque `public_integration_key` such as `int_live_abc123` and a separate high-entropy signing secret.
+3. IncidentFlow returns an ingest URL such as `POST https://ingest.incidentflow.example/v1/events/int_live_abc123` and shows the signing secret once.
+4. The sender computes an HMAC over `timestamp + "." + rawRequestBody` with the signing secret and sends the timestamp, signature, and external event ID in headers.
+5. IncidentFlow uses the public key to find the integration, derives organization/service/environment from it, verifies the signature and replay window, validates/stores the event, and enqueues its internal ID.
+
+The public integration key is an identifier, not the authentication secret. Never put the signing secret in the URL because URLs commonly appear in proxy logs, monitoring, and browser/history tooling. Support secret rotation overlap, revocation, and last-used metadata.
 
 ### Inbound webhook security requirements
 
@@ -169,11 +350,84 @@ Rules should use a restricted, validated schema such as:
 
 Start with `equals`, `in`, and perhaps `contains`; add count-within-time-window rules later.
 
+Keep two rule stages conceptually distinct even if they later share one versioned evaluator:
+
+- **Alert rules** evaluate accepted events and control normalization, explicit suppression, priority, ownership/routing, notification actions, and deduplication inputs. If no custom alert rule matches, a valid event follows a safe default policy that creates or deduplicates an alert; it is not silently ignored.
+- **Incident rules** evaluate alerts and may explicitly create an incident or link an alert to a compatible open incident. Responders may perform the same create/link actions manually.
+
+`ignored` means a valid event was intentionally suppressed by an explicit rule or maintenance policy. `rejected` means the request/event is invalid, unauthorized, or permanently unprocessable. A missing custom-rule match by itself is not ignored or rejected.
+
 ### Optional Node SDK — later, not MVP
 
 Create a small package such as `@incidentflow/node` only after generic webhooks work. It may expose `reportError()` and Express/Fastify error middleware. It sends HTTPS requests to IncidentFlow; it must **not** publish directly to IncidentFlow’s internal SQS queue or receive AWS credentials.
 
 Start by reporting explicit errors and unhandled 5xx errors. Do not create incidents from every ordinary 4xx response.
+
+---
+
+## ITIL alignment
+
+### What ITIL means for IncidentFlow
+
+ITIL (historically “Information Technology Infrastructure Library”) is adaptable best-practice guidance for managing digital and IT services. It is not a mandated database schema or a single universal status workflow.
+
+The purpose of ITIL Incident Management is to minimize the negative impact of incidents by restoring normal service operation as quickly as possible. IncidentFlow should therefore optimize for rapid detection, triage, ownership, communication, mitigation/restoration, resolution, and learning—not for collecting fields or forcing ceremony.
+
+Use these distinctions consistently:
+
+| Record/practice | Purpose |
+|---|---|
+| Event/alert | A detected change or signal that may require attention; not every alert becomes an incident. |
+| Incident | An unplanned interruption to a service or reduction in service quality; focus on restoring service. |
+| Major incident | A high-impact incident requiring exceptional urgency, coordination, and communication. |
+| Problem | The actual or potential cause of one or more incidents; focus on root cause, workarounds, and known errors. |
+| Change | A controlled modification that may remediate a problem or alter a service; focus on risk and safe implementation. |
+| Service request | A normal, predefined user request; it is not an incident and is outside the initial product scope. |
+
+### Product capabilities that support ITIL-aligned incident management
+
+Plan the following capabilities, but add them in the roadmap order rather than all at once:
+
+- service catalog and affected services;
+- impact and urgency captured separately from priority;
+- configurable priority matrix or explicit priority override with an audit reason;
+- categorization and source/channel (`manual`, `monitoring`, `webhook`, later user-reported);
+- ownership, responders, coordinator/incident commander, and stakeholder audiences;
+- explicit timestamps for detected, created, acknowledged, mitigated/restored, resolved, closed, and reopened;
+- an auditable lifecycle that can represent investigation and restoration without conflating resolution with closure;
+- major-incident declaration and a stronger coordination/communication path;
+- acknowledgement and restoration/resolution service-level targets;
+- resolution summary, resolution code, workaround, closure confirmation, and reopen reason;
+- knowledge/runbook links and an evidence-preserving activity timeline;
+- post-incident review, follow-up actions, and links to problem/change records;
+- operational metrics such as MTTA, time to mitigation/restoration, time to resolution, SLA attainment, reopen rate, incident volume per service, and recurring incidents;
+- regular review and continual improvement of rules, incident models, runbooks, services, and response performance.
+
+Potential lifecycle vocabulary:
+
+```text
+open → acknowledged/investigating → mitigated/restored → resolved → closed
+  ↑                                      │                    │
+  └──────────────────── reopened ────────┴────────────────────┘
+```
+
+This is a starting product model, not a claim that ITIL requires those exact status names. Preserve timestamps for important milestones even if the display workflow is later made configurable.
+
+### Claims and certification language
+
+Until independently accredited, describe IncidentFlow as:
+
+> Designed around ITIL-aligned incident-management practices.
+
+Do **not** call IncidentFlow “ITIL compliant,” “ITIL certified,” or an officially ITIL-compatible tool. PeopleCert’s Accredited Tool Vendor programme is the authoritative route for official tool accreditation. Formal accreditation is not a portfolio milestone, but the design should be explainable against Incident Management, Monitoring and Event Management, Problem Management, Change Enablement, Service Level Management, Knowledge Management, and Continual Improvement concepts.
+
+Reference points as of 2026-08-12:
+
+- PeopleCert ITIL Incident Management: <https://www.peoplecert.org/browse-certifications/it-governance-and-service-management/ITIL-1/itil4-practices-incident-management-3684>
+- PeopleCert Accredited Tool Vendors: <https://atv.peoplecert.org/>
+- Atlassian services: <https://support.atlassian.com/jira-service-management-cloud/docs/what-is-services/>
+- Atlassian services and incidents: <https://support.atlassian.com/jira-service-management-cloud/docs/how-services-work-with-incidents/>
+- Opsgenie services: <https://support.atlassian.com/opsgenie/docs/what-are-services-in-opsgenie/>
 
 ---
 
@@ -216,6 +470,18 @@ Use a pnpm workspace. Do not add Turborepo or another orchestrator at the start;
 | AI | Provider-agnostic adapter, structured incident brief | Avoid generic chat; retain provider flexibility and human approval. |
 | CI/CD | GitHub Actions, then AWS OIDC + ECR + CloudFormation | No long-lived cloud credentials in GitHub. |
 
+### Domain and application boundaries
+
+Keep HTTP, domain/application logic, persistence, and external transports separable without creating needless microservices:
+
+- Fastify route handlers authenticate/authorize, validate transport input, call application services, and map errors to HTTP responses.
+- Application/domain services own incident transitions, authorization-relevant invariants, affected-service rules, timeline creation, and transactional behavior.
+- Repository interfaces hide Prisma where a seam materially improves testing or future transport changes; do not wrap every ORM call mechanically.
+- Shared Zod contracts define public API/event boundaries. Generated Prisma types are persistence types and must not become the public contract by accident.
+- Domain changes and their activity/outbox records should be committed atomically where consistency requires it.
+- External effects—notifications, webhooks, AI calls, email, WebSockets, and broker publishing—must not occur inside a database transaction.
+- Preserve ports for realtime publishing, event publishing, notification delivery, object storage, clock/ID generation where deterministic tests or provider replacement justify them.
+
 ### Realtime design
 
 Core domain services must not import Socket.IO directly. Define a port such as:
@@ -249,28 +515,149 @@ WebSocket events are fast update signals, not the source of truth. On reconnecti
 
 ---
 
+## Cross-cutting production-readiness requirements
+
+These are ongoing acceptance criteria, not one final “hardening sprint.” Apply each item when the relevant feature first appears.
+
+### Tenant isolation and authorization
+
+- Never accept an `organization_id` from the browser as proof of tenant context.
+- Derive organization/user context from the authenticated session/token and verify membership server-side.
+- Scope every tenant-owned query and mutation by organization; prefer composite organization-scoped constraints and foreign keys as defense in depth.
+- Define a permission matrix for roles and high-impact actions. A UI-hidden button is not authorization.
+- Test cross-tenant access attempts, insecure direct-object references, role boundaries, disabled users, and revoked sessions.
+- Record actor identity and request/correlation ID for material audit events once identity exists.
+
+### API and application security
+
+- Validate path, query, headers, and bodies with strict schemas; enforce maximum sizes and reject unknown/unsafe shapes where appropriate.
+- Centralize safe error mapping; do not leak stack traces, connection details, secrets, or raw provider responses.
+- Use secure cookies or carefully scoped tokens, CSRF protection where cookie authentication requires it, password hashing through an established library, session rotation/revocation, and login rate limiting.
+- Apply HMAC verification to raw webhook bytes, timing-safe comparison, replay windows, secret rotation, and idempotency constraints.
+- Validate outbound destinations and defend against SSRF, DNS rebinding, private/link-local addresses, redirect abuse, and oversized/slow responses.
+- Add dependency/security scanning, secret scanning, locked dependencies, and a documented vulnerability-handling process in CI.
+
+### Reliability and consistency
+
+- Make state transitions explicit and transactionally record the corresponding activity/domain event.
+- Use idempotency keys or natural unique constraints for externally retried commands.
+- Put timeouts on network calls and database operations where supported; propagate cancellation when practical.
+- Classify retryable versus permanent failures. Use capped exponential backoff with jitter, limited attempts, and DLQ/permanent-failure visibility.
+- Treat queues and brokers as at-least-once. Consumers must be idempotent; never claim exactly-once processing.
+- Provide safe replay/retry tooling with permissions and an audit trail rather than relying on manual database edits.
+- Document backup, restore, migration rollback/roll-forward, and disaster-recovery expectations before calling the cloud deployment production-like.
+
+### Observability and operability
+
+- Emit structured logs with timestamp, level, service, environment, request ID, trace/correlation ID, organization ID where safe, route/job name, duration, outcome, and sanitized error classification.
+- Add HTTP request metrics, latency/error rates, database-pool saturation, queue age/depth, retry counts, DLQ counts, webhook delivery outcomes, WebSocket connection counts, and AI usage/cost when relevant.
+- Add distributed tracing across API → outbox/broker → worker → external delivery paths when asynchronous work exists.
+- Separate liveness from readiness. Readiness should fail when a required dependency prevents useful service.
+- Define actionable alerts and runbooks for API error/latency, database exhaustion, stuck outbox leases, queue backlog, DLQ messages, and repeated delivery failures.
+- Build operator-facing views for received events, processing state, failed messages, retries, deliveries, and replay rather than hiding failures in logs.
+
+### Testing strategy
+
+- Unit tests: schemas, authorization policies, rule evaluation, dedupe keys, priority calculations, transition invariants, retry classification, and pure domain logic.
+- Repository/integration tests: real PostgreSQL migrations, organization scoping, constraints, transactions, concurrent claims, and rollback behavior.
+- API contract tests: status codes, validation, error shape, authentication, authorization, idempotency, pagination/filtering, and rate limits.
+- Worker tests: duplicate delivery, transient/permanent failure, retry scheduling, poison messages, lease expiry, and DLQ behavior.
+- End-to-end tests: a small set of valuable journeys such as sign-in, service creation, incident creation, status/assignment change, webhook ingestion, and failure inspection.
+- Migration tests: apply all migrations from an empty database and, when practical, upgrade a representative previous schema/data snapshot.
+- Do not optimize for coverage percentage alone; cover invariants and failure modes that would create security or reliability incidents.
+
+### Data lifecycle and privacy
+
+- Classify stored data and minimize raw inbound payloads. Redact authorization headers, secrets, tokens, and unnecessary personal data before persistence or logging.
+- Define retention for received events, webhook delivery bodies, audit logs, attachments, AI inputs/outputs, and deleted organizations.
+- Use UTC timestamps in persistence/contracts and format only at the presentation edge.
+- Support safe organization offboarding/export/deletion later; deletion jobs must be idempotent and auditable.
+- Encrypt data in transit and at rest; manage secrets with environment isolation locally and Secrets Manager or equivalent in cloud.
+
+### Performance and scalability
+
+- Add pagination to unbounded lists and stable ordering/cursors before volumes make it urgent.
+- Create indexes from observed query patterns and inspect query plans for important dashboards and worker claims.
+- Avoid N+1 queries and unbounded payload expansion, especially timelines, affected services, event histories, and deliveries.
+- Define load-test scenarios and realistic initial service-level objectives before cloud release; measure instead of inventing scale claims.
+- Prefer modular-monolith boundaries and independently scalable worker processes before splitting into microservices.
+
+### CI/CD and release discipline
+
+- Pull requests must run formatting/lint, typecheck, tests, production builds, migration validation, and security checks.
+- Use ephemeral PostgreSQL in CI for integration/migration tests.
+- Use AWS OIDC and least-privilege deployment roles; never store long-lived AWS access keys in GitHub.
+- Produce immutable versioned images, track the deployed commit/schema version, and retain a rollback or safe roll-forward procedure.
+- Apply infrastructure changes through reviewed CloudFormation change sets. Separate environments and protect production-like deploys.
+- Maintain concise architecture decision records and runbooks for decisions/failure modes a reviewer or operator would reasonably ask about.
+
+---
+
 ## Data model, event state, and reliability
 
-### Initial business tables
+### Staged business tables
 
 - `organizations`
 - `users`
+- `organization_memberships`
 - `teams`
+- `team_memberships`
+- `services`
+- `service_environments`
+- `service_dependencies` (later)
+- `alerts`
+- `alert_events`
 - `incidents`
+- `incident_alerts`
+- `incident_affected_services`
 - `incident_activity`
+- `incident_responders` (later)
+- `incident_stakeholders` (later)
+- `incident_service_targets` (later)
+- `post_incident_reviews` and follow-up actions (later)
+- `problems` / incident-problem links (later)
+- `changes` / incident-change links (later)
 - `integrations`
-- `incident_rules`
+- `alert_rules`
+- `incident_rules` (later)
 - `received_events`
+- `event_processing_attempts` (with bounded retention when async processing exists)
 - `outbox_events`
 - `processed_messages`
 - `webhook_subscriptions`
 - `webhook_deliveries`
 - `notifications`
+- `on_call_schedules`, rotations/overrides, and `escalation_policies` (bounded later phase)
 - `ai_runs`
 
-Do not create every table on day one. Start with organizations, teams, incidents, and incident activity.
+Do not create every table at once. Organizations, teams, incidents, and incident activity were the first slice. Services and affected-service relations are the next domain foundation. Add later tables only with the user-facing/operational milestone that exercises them.
 
-### Received events / inbox
+### Incident and service invariants
+
+- Every tenant-owned row has an organization boundary, directly or through a constraint that cannot cross organizations.
+- An incident can affect zero services temporarily during migration/onboarding, but normal UI/API flows should encourage at least one affected service once the catalog exists.
+- Multiple affected services are allowed. At most one relation may be marked `is_primary = true`; enforce this with an appropriate PostgreSQL partial unique index if Prisma cannot express it directly.
+- Service ownership does not silently overwrite the incident’s coordinating team. Automation may suggest or explicitly route based on the primary service owner.
+- Service tier is business criticality; incident priority is the urgency/order of response to a specific event. They are related but not identical.
+- Incident lifecycle changes, assignments, affected-service changes, priority overrides, major-incident declarations, and reopen/closure actions must be auditable.
+- Preserve meaningful milestone timestamps rather than trying to reconstruct them later from mutable status alone.
+
+### Event, alert, and incident invariants
+
+- A received event is immutable after acceptance except for processing status and sanitized error/result metadata.
+- Events never directly create or reference incidents. Event processing first creates an alert or associates the event with an existing alert; incident lineage is then represented through `incident_alerts`.
+- Alert dedupe keys are organization- and integration/service-scoped; the same customer-provided key in another tenant can never collide.
+- Repeated events append evidence/history and update counters/timestamps on an existing open alert rather than overwriting the original event.
+- `alert_events` records event-to-alert lineage. Enforce organization consistency and prevent the same event/alert association from being inserted twice.
+- Alert acknowledgement/closure and incident lifecycle are separate state machines. Closing an alert must not silently resolve a linked incident, and resolving an incident must not erase alert history.
+- An alert may link to zero or more incidents and an incident to zero or more alerts; enforce all links within one organization.
+- `incident_alerts` is the sole source of truth for alert-to-incident association; do not duplicate `incident_id` on `received_events`.
+- Rule-driven incident creation/linking and manual linking/unlinking must be explicit, idempotent, and recorded in the audit timeline. Store either the initiating user or rule where available.
+- Received-event processing status, alert lifecycle status, and incident lifecycle status are three independent state machines.
+- Every externally received event is authorized through an active integration and therefore has an unambiguous organization, service, and environment. The integration configuration is authoritative; payload assertions cannot switch those boundaries.
+- A missing custom alert-rule match uses the integration's safe default alert policy. Only an explicit suppression/maintenance decision produces `ignored`.
+
+### Received-event inbox and processing audit
 
 `received_events` is an audit and idempotency record for accepted inbound webhook events.
 
@@ -284,20 +671,31 @@ external_event_id
 received_at
 payload_json (redacted)
 payload_hash
-status
+processing_status
 matched_rule_id
-incident_id
-error_message
+processing_attempt_count
+next_processing_attempt_at (nullable)
+last_processing_error_code (nullable)
+last_processing_error_message (sanitized, nullable)
 retention_expires_at
 ```
 
 Suggested status progression:
 
 ```text
-received → queued → processing → incident_created
+received → queued → processing → alert_created
+                         ↘ alert_deduplicated
                          ↘ ignored
-                         ↘ failed → dead_lettered
+                         ↘ rejected
+                         ↘ retry_scheduled → processing
+                                             ↘ dead_lettered
 ```
+
+These are enum-like processing-status values, not embedded alert objects. `alert_created` means the event produced a new alert. `alert_deduplicated` means it matched an existing open alert: the event is linked through `alert_events`, retained as evidence, and the alert's occurrence count and last-seen timestamp are updated. The alert itself lives in `alerts`; related incidents are discovered through `alert_events` and `incident_alerts` rather than a direct `incident_id` on the event.
+
+`processing_attempt_count` counts IncidentFlow worker attempts for this event, not occurrences of the customer's error. `next_processing_attempt_at` is populated only while a transient failure is waiting for retry and records the expected earliest retry time; it is null before failure and after any terminal result. The `last_processing_error_*` fields summarize the latest IncidentFlow processing failure, not the error reported by the customer payload. Stable codes support filtering/metrics/retry classification; the sanitized message helps operators. When async processing is implemented, preserve bounded per-attempt diagnostic history in `event_processing_attempts` and apply retention rather than storing unbounded arrays on `received_events`.
+
+`retry_scheduled` means another automatic attempt is expected. `rejected` is a terminal permanent input/configuration decision for which retry cannot help. `dead_lettered` means retryable or unknown processing failures exhausted the queue's automatic-attempt policy and now require inspected, audited replay.
 
 This is not an infinite raw-data archive. Retention should be defined (e.g. 30–90 days), and it must never include authorization headers or secrets.
 
@@ -367,9 +765,21 @@ Use `processed_messages` with a unique `(consumer_name, event_id)` constraint. I
 
 If redelivered, the unique constraint identifies it as completed and the worker can safely acknowledge it.
 
+`processed_messages` is not a customer-facing event index or query optimization. It records completion independently per consumer because one domain message may be handled by notification, webhook, realtime, analytics, and other consumers. `received_events.processing_status` describes inbound event processing and cannot prove that every downstream consumer completed the same message.
+
 ### Retries and exponential backoff
 
-For transient failures, retry with increasing waits, e.g. 1s, 2s, 4s, 8s, 16s, capped at a maximum. Add jitter to avoid synchronized retry storms. After a limited number of attempts, move the message to a DLQ or mark it permanently failed with tooling to inspect/replay it.
+For transient failures, retry with increasing waits capped at a maximum and add jitter to avoid synchronized retry storms. The worker leaves the SQS message unacknowledged and may change its visibility timeout to the selected delay; after the visibility period, SQS can deliver it again. Persist `retry_scheduled`, the attempt count, expected next attempt time, and sanitized latest processing error for operator visibility.
+
+Classify failures explicitly:
+
+- retryable: temporary dependency, database, lock, or infrastructure failure;
+- permanent: invalid/unsupported data or configuration that retry cannot repair; record `rejected` and acknowledge the message;
+- unknown: retry a small bounded number of times, then dead-letter for investigation.
+
+Use an SQS redrive policy with a deliberately chosen maximum receive count (approximately five initially, validated through failure tests). Once exhausted, SQS moves the message to a DLQ and normal workers stop receiving it. A DLQ reconciliation consumer—initially another consumer mode in the same worker application—durably marks the received event `dead_lettered`, records final metadata, and only then deletes the DLQ copy. PostgreSQL becomes the operator-facing dead-letter work queue because the sanitized event already exists there.
+
+Replay requires an authorized human/operator action, a reason, and an audit record. It publishes a new processing message without erasing prior attempts or dead-letter history. Alert on any DLQ depth and on queue age/backlog breaching the processing SLO. These are IncidentFlow platform alarms evaluated by CloudWatch from SQS metrics and delivered through an independent operator-notification path; do not rely solely on the possibly unhealthy IncidentFlow pipeline to report its own outage.
 
 ---
 
@@ -429,152 +839,240 @@ Store every run in `ai_runs`: input version, result, provider/model metadata, ti
 
 ## Implementation roadmap
 
-### Phase 0 — setup
+Each phase must produce a demonstrable user or operator outcome, include tests proportionate to risk, update documentation, and leave the project runnable. Cross-cutting production requirements apply from the phase in which their underlying capability first exists.
 
-- pnpm workspace.
-- Next.js web app.
-- Fastify API with `GET /health`.
-- Docker Compose PostgreSQL.
-- Root README, `.env.example`, lint/typecheck/test scripts.
-- First Git commit.
+### Phase 0 — foundation (complete)
 
-### Phase 1 — manual incidents
+- pnpm workspace with Next.js web and Fastify API.
+- `GET /health`.
+- PostgreSQL in Docker Compose with a named volume and health check.
+- Root environment example, README, lint/typecheck/test/build scripts.
+- Initial Git foundation commit.
 
-- Prisma setup and migrations.
-- Seed a development organization/team.
-- Incidents and activity timeline.
-- API: create/list/get/status update incident routes.
-- Dashboard list and incident detail page.
+### Phase 1 — manual incident lifecycle (complete)
 
-### Phase 2 — identity and permissions
+- Prisma 7 with PostgreSQL driver adapter, migration, and idempotent seed.
+- Seeded development organization and Platform team.
+- Organization-scoped incidents and transactional activity timeline.
+- API routes for teams and create/list/get/update incident operations with Zod validation.
+- Dashboard incident summary/list, creation form, detail view, status/team controls, loading/error/not-found states.
+- Browser-level lifecycle verification and PostgreSQL container-restart persistence verification.
 
-- Authentication.
-- Organizations, users, teams, membership/roles.
-- Server-side authorization checks.
+Known intentional limitation: tenant context is temporarily derived from a fixed seeded development organization until Phase 2 authentication. Do not mistake this for production authorization.
 
-### Phase 3 — real-time dashboard
+### Phase 1.5 — service catalog and affected services (recommended next)
 
-- Socket.IO server and authenticated rooms.
-- Live updates for manual create/status/assignment actions.
-- Reconnect behaviour that refetches the canonical API state.
+This is a domain-foundation milestone, not scope creep. It makes IncidentFlow authentically service-oriented before authentication, webhook routing, rules, and notifications depend on the wrong model.
 
-### Phase 4 — source integration/webhook
+#### Data and invariants
 
-- Integration setup UI.
-- Integration key and secret creation/rotation.
-- HMAC/timestamp verification and Zod payload validation.
-- `received_events` audit record, idempotency constraint, and status UI.
-- Local demo event sender that generates realistic checkout/service errors.
+- Add `services` with organization, owning team, name/slug, description, type, tier, operational status, timestamps, and suitable indexes.
+- Add service-owned environments with a unique name/slug per service, kind, active/archived lifecycle, and optional ephemeral/expiry metadata. Seed normal development/staging/production examples without requiring every service to use the same set.
+- Add `incident_affected_services` with organization-scoped composite foreign keys, unique incident/service membership, `is_primary`, and an at-most-one-primary constraint.
+- Seed realistic services such as Checkout API, Payment Processing, Customer Portal, PostgreSQL Primary, and Stripe.
+- Migrate existing development incidents safely; either leave them temporarily unclassified with clear UI or attach an explicit seeded service based on a documented migration decision.
+- Record affected-service additions/removals/primary changes in `incident_activity`.
+- Keep service ownership and incident coordinating-team assignment distinct.
 
-### Phase 5 — queues and outbox
+#### API and UI
 
-- LocalStack.
-- SNS, SQS, queues, DLQs.
-- Worker application.
-- Version-1 transactional outbox and polling dispatcher.
-- Rule evaluation, incident auto-creation, dedupe/grouping.
+- Service create/list/get/update/archive APIs with strict organization scoping and validation.
+- Service catalog/detail page with type, tier, owner, status, service environments, and incident counts/history.
+- Service environment create/update/archive workflows; creating an environment never creates a duplicate service.
+- Incident creation/update supports multiple affected services and one optional primary service.
+- Incident detail displays affected services and owner context.
+- Dashboard filtering by service, team, status, and priority with URL-backed filters.
+- Add pagination/stable ordering before lists become unbounded.
 
-### Phase 6 — notifications/integrations
+#### Quality and operations
 
-- In-app notifications.
-- Email notification worker.
-- Outbound webhook subscription setup, signature, delivery records, retries.
+- Unit tests for service schemas and primary-service invariant.
+- PostgreSQL integration tests for cross-tenant foreign keys and unique constraints.
+- API tests for service filtering and invalid/cross-organization references.
+- Browser tests for service creation, incident association, and service filtering.
+- Add baseline GitHub Actions CI now if it is not already present: install with frozen lockfile, Prisma generation, migration validation/integration database, lint, typecheck, tests, and production build.
 
-### Phase 7 — AI brief
+Do not add dependency graphs, automatic priority mapping, broad CMDB fields, or status-page publishing yet. Preserve seams for those later capabilities.
 
-- Provider adapter.
-- Structured output validation.
-- Background worker, status updates, human approval UI.
+### Phase 2 — identity, memberships, and authorization
 
-### Phase 8 — cloud and CI/CD
+- Select and document the authentication approach deliberately; prefer secure server-managed sessions for the web app unless another client requirement justifies tokens.
+- Add users, organization memberships, team memberships, roles, invitation/onboarding, session records/revocation, and disabled-user behavior.
+- Define a permission matrix such as organization owner/admin, responder/member, and read-only stakeholder/viewer. Avoid hard-coding scattered role-name comparisons; authorize named actions.
+- Replace the fixed development-organization context with authenticated tenant context.
+- Enforce authorization in application/API services for organizations, teams, services, incidents, and administrative actions.
+- Secure cookies, CSRF defense where required, password hashing or external identity provider integration, login throttling, session rotation, logout/revocation, and safe error responses.
+- Audit actor identity for incident/service/permission changes.
+- Test cross-tenant IDOR attempts, role boundaries, revoked sessions, invitations, and disabled accounts.
 
-- Docker images.
-- ECR and AWS deployment.
-- CloudFormation.
-- GitHub Actions: lint/typecheck/tests/build in pull requests; build/push/deploy after merge to main.
-- AWS OIDC authentication; no permanent credentials committed or stored in CI.
+### Phase 3 — real-time incident coordination
 
-### Version 2
+- Socket.IO server behind `RealtimePublisher`; domain/application code must not import Socket.IO.
+- Authenticated organization, incident, and user rooms with authorization on join.
+- Live incident create/status/assignment/affected-service/activity updates.
+- Reconnect behavior refetches canonical API state; sequence/version information prevents stale updates from winning.
+- Backpressure/payload limits, connection metrics, safe disconnect/revocation behavior, and tests using `NoopRealtimePublisher` plus selected socket integration tests.
 
-- Debezium CDC.
-- Kafka/Confluent for outbox event publishing.
-- Retain the same outbox table and domain-event contract.
+### Phase 4 — source integrations and secure webhook intake
+
+- Integration setup UI requires a service environment and allows multiple independently managed integrations per service environment.
+- Generate an opaque public integration key for `POST /v1/events/:integrationKey` plus a separate signing secret shown once; store a secure verifier/encrypted representation, support rotation overlap, revoke, and last-used metadata.
+- Derive organization, service, and environment from the integration record. Payload service/environment fields are optional assertions only and must match configuration when present.
+- HMAC SHA-256 of `timestamp + "." + rawBody`, timing-safe verification before parsing, replay window, body-size/content-type limits, and per-integration rate limits.
+- Zod event contract with stable API versioning and sanitized validation errors.
+- `received_events` audit/inbox record, payload redaction/hash, retention, unique `(integration_id, external_event_id)` idempotency, and fast `202 Accepted` semantics.
+- Received-event UI shows processing status, matched service/rule, resulting alert, any incidents linked through that alert, sanitized failure, and correlation ID.
+- Local demo sender generates realistic checkout/payment errors and supports duplicate/invalid-signature/replay scenarios.
+- Integration tests cover raw-body signatures, rotated/revoked secrets, replay, duplicates, malformed/oversized input, and cross-tenant isolation.
+
+### Phase 5 — asynchronous alert processing, rules, dedupe, and outbox
+
+- Add LocalStack only now, plus SNS, SQS, queues, DLQs, and the worker application.
+- Transactional outbox for integration/alert/incident domain events; short claim transaction, `FOR UPDATE SKIP LOCKED`, publishing lease, capped retry/backoff/jitter, and reclaim after crash.
+- Declarative rule evaluator using a versioned restricted schema; no arbitrary customer code.
+- Alert rules process events; a valid event with no custom match follows a safe default create/deduplicate policy. Explicit suppression produces `ignored`, while permanent invalid/configuration failures produce `rejected`.
+- Incident rules operate on alerts and may explicitly create/link incidents; keep their trigger/action contracts distinct from alert rules even if they share evaluator infrastructure.
+- Normalize accepted events into first-class alerts with source, service, message/details, priority, dedupe key, occurrence count, first/last-seen timestamps, owner/responders, status, and audit history.
+- Route/priority/team/service/notification actions are explicit and auditable. Service tier may participate only through a visible rule or mapping.
+- Dedupe/grouping keys and windows are deterministic, tenant-scoped, integration/service-aware, and tested under concurrent/duplicate delivery.
+- Alert list/detail workflows support acknowledge, assign, close, history/evidence, “create incident from alert,” “link to existing incident,” and audited unlink actions. Avoid making every alert an incident.
+- Model `alert_events` and many-to-many `incident_alerts` with organization-scoped constraints and audit metadata so event evidence and grouped alerts survive incident lifecycle changes.
+- Add a bounded integration-heartbeat monitor after normal alert processing works: a missing expected heartbeat creates/deduplicates an alert and recovers visibly when heartbeats resume.
+- `processed_messages` consumer idempotency; acknowledge SQS only after the business transaction commits.
+- Persist retry scheduling/latest processing failure on `received_events`, retain bounded attempt history, configure an SQS redrive policy, reconcile DLQ messages durably, and provide permissioned audited replay.
+- Operator UI/commands for outbox backlog, received-event state, worker failure, DLQ inspection, and permissioned replay.
+- Metrics/traces for queue depth/age, processing latency, retries, outbox leases, DLQ count, and duplicate suppression.
+- Concurrency and failure-injection tests cover worker death between commit/ack, publish success before marking, poison messages, lease expiry, and replay.
+
+### Phase 6 — notifications, stakeholder delivery, and outbound webhooks
+
+- In-app notification model/preferences and realtime delivery signal.
+- Email delivery through a provider adapter with templates, provider message IDs, suppression/bounce handling where available, and per-recipient delivery history.
+- Outbound webhook subscriptions with selected event types, verified ownership/test delivery, encrypted secret, signing, delivery records, timeouts, retry/backoff/jitter, disablement policy, and manual replay.
+- Strong SSRF defense: URL validation, allowed schemes/ports, DNS/IP checks, redirect policy, private/link-local blocking, response-size/time limits, and revalidation at delivery time.
+- Separate internal responder events from curated stakeholder updates.
+- Operator/customer UI exposes attempts, sanitized request/response metadata, next retry, permanent failure, and replay audit.
+- Contract and failure tests cover signatures, duplicates, slow/down destinations, redirects, retry classification, and secret rotation.
+
+### Phase 7 — ITIL-aligned operational incident management
+
+- Impact and urgency fields plus an organization-configurable priority matrix and audited override.
+- Richer lifecycle/milestone timestamps: detected, acknowledged, mitigated/restored, resolved, closed, reopened.
+- Resolution summary/code, workaround, closure confirmation, and reopen reason.
+- Major-incident declaration, incident coordinator/commander, responders, stakeholders, and scheduled/ad-hoc stakeholder updates.
+- Service-level targets for acknowledgement and restoration/resolution; pause semantics must be explicit and not gameable.
+- Runbook/knowledge/evidence links and an operational command/timeline view.
+- Post-incident review with impact, timeline, contributing factors, lessons, and owned/due follow-up actions.
+- Minimal problem and change records/links sufficient to demonstrate the distinction between restoration, root-cause work, and controlled remediation. Do not turn IncidentFlow into general Jira issue tracking.
+- Metrics/dashboard: MTTA, time to mitigation/restoration, MTTR with clearly documented definition, SLA attainment, reopen rate, incident volume per service/team/source, recurring incidents, and major-incident review completion.
+- Exportable audit/report data and tests for clock/timestamp calculations, SLA transitions, reopen/closure invariants, and authorization.
+
+Describe this milestone as ITIL-aligned, not certified.
+
+### Phase 8 — bounded on-call schedules and escalations
+
+- Build only after reliable notifications exist.
+- Team schedules, time zones, rotations, effective intervals, overrides, and “who is on call now?” calculation.
+- Escalation policies with ordered delays/targets, acknowledgement cancellation, deduplicated notifications, and an audit timeline.
+- Contact-method preferences and safe test notification flow; start with email/in-app or one provider before considering SMS/voice.
+- Schedule preview, gaps/overlaps validation, override UI, and escalation simulation/testing tools.
+- Tests emphasize DST/time-zone transitions, concurrent acknowledgements, delayed jobs, overrides, retries, and escalation cancellation.
+- Do not claim global telephony/PagerDuty-scale availability; document provider and delivery limitations honestly.
+
+### Phase 9 — AI incident brief with human review
+
+- Provider-agnostic adapter and versioned structured-output Zod contract.
+- Inputs are least-privilege, redacted, size-limited, and explicitly selected from incident/activity/service/attachment evidence.
+- Asynchronous execution, idempotency, timeouts, retry classification, quotas/cost controls, cancellation, and provider/model metadata.
+- Output includes summary, affected service/system, suggested severity, possible next steps, confidence, and evidence references.
+- Human approve/reject/edit workflow; AI never autonomously declares major incidents, pages responders, changes status, or triggers high-impact actions.
+- Prompt-injection-aware attachment handling, retention controls, audit history, and evaluation fixtures for groundedness/structure/safety.
+
+### Phase 10 — cloud platform, CI/CD, and infrastructure as code
+
+- Web/API/worker Docker images with non-root users, health checks, minimal runtime layers, pinned bases, scanning, and reproducible builds.
+- Intentionally choose Lambda containers versus ECS/App Runner or another container service based on WebSocket/process/concurrency needs; record the ADR.
+- ECR, selected compute, API Gateway where appropriate, S3, SNS, SQS/DLQs, IAM, Secrets Manager, CloudWatch, and networking through CloudFormation.
+- Neon PostgreSQL remains acceptable initially; document connectivity, pooling, backup/restore, migration, and environment isolation.
+- GitHub Actions uses AWS OIDC, immutable image tags, environment protections, CloudFormation change sets, deployment smoke tests, and rollback/safe roll-forward instructions.
+- WAF and API Gateway throttling complement application tenant quotas; they do not replace them.
+- Structured centralized logs, metrics, traces, dashboards, alarms, runbooks, and cost/budget alerts.
+
+### Phase 11 — production-readiness review and portfolio release
+
+- Threat model and abuse-case review covering authentication, tenancy, webhook intake, outbound SSRF, secrets, uploads, replay, rate limits, and AI data flow.
+- Load tests for dashboard/API, webhook bursts, rule/dedupe processing, outbox, workers, notifications, and WebSockets against documented initial SLOs.
+- Backup/restore and disaster-recovery exercise; migration from a representative prior version; DLQ/outbox replay exercise.
+- Retention/deletion jobs, attachment/payload limits, organization offboarding, audit/export expectations, and privacy/security documentation.
+- Operational game day: database unavailable, queue backlog, worker crash, stuck lease, provider outage, notification failure, and deployment rollback.
+- Architecture diagrams, ADRs, API/event contracts, runbooks, demo data/script, screenshots, and an honest portfolio README describing scope, guarantees, tradeoffs, and future work.
+- No unresolved high-severity security findings and no hidden manual steps required for the documented deployment/demo path.
+
+### Version 2 / scale evolution
+
+- Debezium CDC reads the retained outbox table and publishes to Kafka/Confluent without changing domain code/event contracts.
+- Schema registry/versioning, consumer groups, replay strategy, partition-key decisions, and migration/coexistence plan.
+- Service dependency graph and impact propagation/suggestions with explicit confidence; avoid claiming causality merely from topology.
+- More advanced analytics, incident correlation, status-page publishing, integration marketplace, and on-call/notification providers only when justified by measured needs.
+- Keep the polling outbox as a well-understood version-1 architecture; Kafka is an evolution, not proof of production readiness by itself.
 
 ---
 
-## Current code state — 2026-08-05
+## Current code state — 2026-08-14
 
-- Project directory exists: `/Users/arsahin/Developer/incidentflow`.
-- The directory is otherwise empty; no Git repository, Node project, Docker files, or application code has been created yet.
-- This file is the first project artifact.
+- Repository: `/Users/arsahin/Developer/incidentflow`.
+- Git is initialized. At the time of this handoff, the checked-out branch is `phase_1`; always inspect current branch/status before modifying files.
+- Phase 0 foundation and Phase 1 manual incident lifecycle are implemented.
+- Relevant milestone commit: `dd3a65d feat: add manual incident lifecycle`.
+- pnpm workspace contains `apps/web`, `apps/api`, and the placeholder `packages/contracts`.
+- Next.js dashboard supports incident creation, listing, detail, status/team updates, and activity history.
+- Fastify API exposes health, team, and incident lifecycle routes with Zod validation.
+- Prisma/PostgreSQL schema currently has organizations, teams, incidents, and incident activity. A migration and idempotent development seed exist.
+- PostgreSQL runs through Docker Compose with persistent storage. Phase 1 was verified through tests, production builds, browser interaction, API runtime, and database restart persistence.
+- The database may contain development incidents created during verification; do not assume it is empty.
+- Authentication is not implemented. API tenant context still uses the seeded development organization and is not production authorization.
+- Services, service environments, and affected-service relations are not implemented yet; Phase 1.5 is the recommended next milestone.
+- Existing uncommitted user changes may be present. Always inspect and preserve them; never treat a dirty worktree as disposable.
 
-### Recommended local location
-
-Use `/Users/arsahin/Developer/incidentflow`, not `Documents`, to avoid potential iCloud/Dropbox/OneDrive synchronization problems with `node_modules`, file watchers, and Docker bind mounts.
-
-### Initial setup commands
-
-Run manually from Terminal:
+### Local development
 
 ```bash
 cd /Users/arsahin/Developer/incidentflow
-
-git init -b main
-corepack enable
-pnpm init
-
-mkdir -p apps/api/src apps/worker/src packages/contracts/src infra/cloudformation
+cp .env.example .env         # only if .env does not already exist
+pnpm install
+docker compose up -d db
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
 ```
 
-Create `pnpm-workspace.yaml`:
+Expected local URLs:
 
-```yaml
-packages:
-  - apps/*
-  - packages/*
-```
+- Dashboard: <http://localhost:3000>
+- API health: <http://localhost:4000/health>
 
-Then scaffold the web application:
+Quality gate:
 
 ```bash
-pnpm create next-app@latest apps/web \
-  --ts \
-  --eslint \
-  --tailwind \
-  --app \
-  --src-dir \
-  --use-pnpm \
-  --disable-git \
-  --yes
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
-
-Set the web package name to `@incidentflow/web`.
-
-Create the API package:
-
-```bash
-cd apps/api
-pnpm init
-pnpm add fastify zod @fastify/cors
-pnpm add -D typescript tsx @types/node
-pnpm exec tsc --init
-cd ../..
-```
-
-Set the API package name to `@incidentflow/api`.
 
 ---
 
 ## Immediate open tasks for the coding assistant
 
-1. Inspect the actual repository state before modifying anything.
-2. Scaffold Phase 0 only; do not jump to queues, AWS, AI, or WebSockets.
-3. Create a clean root `package.json`, `pnpm-workspace.yaml`, `.gitignore`, README, and `.env.example`.
-4. Scaffold Next.js in `apps/web` and Fastify in `apps/api`.
-5. Add `GET /health` to the API and a minimal web dashboard shell.
-6. Add Docker Compose with PostgreSQL only, including a named volume and health check.
-7. Verify web, API, and database run locally and document the commands.
-8. Commit the foundation before beginning Phase 1.
+1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
+2. Treat Phase 1.5 service catalog and affected services as the recommended next product milestone unless the user explicitly chooses Phase 2 identity first.
+3. Before implementation, confirm the migration/backfill choice for existing development incidents from repository/data context; avoid destructive reset unless explicitly authorized.
+4. Implement services, service-owned environments, and many-to-many incident affected services with organization-scoped database constraints and audited changes.
+5. Add service catalog/detail and environment-management UI, incident affected-service selection/display, and URL-backed dashboard filtering.
+6. Add PostgreSQL integration tests for tenancy/constraints and browser tests for the primary service journeys.
+7. Add or strengthen baseline GitHub Actions CI during this milestone if not already present.
+8. Keep the milestone local and runnable. Do not jump to AWS, queues, AI, Kafka, or on-call before their prerequisites work.
+9. Update this context, README, migration documentation, and roadmap status when the milestone is complete.
 
 ## Working preferences for the coding assistant
 

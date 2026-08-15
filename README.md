@@ -10,7 +10,7 @@ The first product vertical slice is working locally:
 - a Next.js dashboard with incident creation, listing, detail, and lifecycle controls;
 - a validated Fastify API for teams and incidents;
 - Prisma migrations and a seeded development organization/team;
-- transactional incident activity history for creation, assignment, and status changes;
+- Transactional incident activity history for creation, assignment, and status changes;
 - PostgreSQL in Docker Compose with a persistent named volume.
 
 Authentication, WebSockets, queues, AWS resources, and AI are intentionally deferred to their roadmap phases.
