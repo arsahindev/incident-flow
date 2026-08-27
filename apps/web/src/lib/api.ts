@@ -1,15 +1,23 @@
 import "server-only";
 
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
 import type {
+  AuthSession,
   IncidentDetail,
   IncidentPagination,
   IncidentPriority,
   IncidentStatus,
   IncidentSummary,
+  Invitation,
+  OrganizationMember,
+  OrganizationAccess,
   Service,
   ServiceDetail,
   Team,
 } from "./types";
+import { sessionCookieName } from "./auth-constants";
 
 export class ApiError extends Error {
   constructor(
@@ -30,19 +38,51 @@ function apiUrl(path: string) {
 }
 
 export async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
+  const sessionToken = (await cookies()).get(sessionCookieName)?.value;
   const response = await fetch(apiUrl(path), {
     ...init,
     cache: "no-store",
     headers: {
       "content-type": "application/json",
+      ...(sessionToken ? { authorization: `Session ${sessionToken}` } : {}),
       ...init?.headers,
     },
   });
+  if (response.status === 204) return undefined as T;
   const body = (await response.json()) as { error?: string } & T;
   if (!response.ok) {
     throw new ApiError(body.error ?? "The API request failed", response.status);
   }
   return body;
+}
+
+export async function getOptionalSession() {
+  try {
+    return (await requestApi<{ session: AuthSession }>("/v1/auth/session")).session;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return null;
+    throw error;
+  }
+}
+
+export async function requireSession() {
+  const session = await getOptionalSession();
+  if (!session) redirect("/login");
+  return session;
+}
+
+export function getMembers() {
+  return requestApi<{ members: OrganizationMember[] }>("/v1/members");
+}
+
+export function getOrganizations() {
+  return requestApi<{ organizations: OrganizationAccess[] }>(
+    "/v1/auth/organizations",
+  );
+}
+
+export function getInvitation(token: string) {
+  return requestApi<{ invitation: Invitation }>(`/v1/invitations/${token}`);
 }
 
 export function getIncidents(filters: {

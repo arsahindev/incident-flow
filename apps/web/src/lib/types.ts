@@ -3,6 +3,62 @@ export type IncidentPriority = "low" | "medium" | "high" | "critical";
 
 export type Team = { id: string; name: string; slug: string };
 
+export type Permission =
+  | "incidents.read"
+  | "incidents.manage"
+  | "services.read"
+  | "services.manage"
+  | "teams.read"
+  | "members.read"
+  | "members.manage";
+
+export type AuthSession = {
+  sessionId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  organizationId: string;
+  organizationSlug: string;
+  organizationName: string;
+  role: "owner" | "admin" | "responder" | "viewer";
+  permissions: Permission[];
+};
+
+export type OrganizationAccess = {
+  id: string;
+  name: string;
+  slug: string;
+  role: AuthSession["role"];
+};
+
+export type SessionResult = {
+  token: string;
+  expiresAt: string;
+  context: AuthSession;
+};
+
+export type OrganizationMember = {
+  userId: string;
+  email: string;
+  displayName: string;
+  userStatus: "active" | "disabled";
+  role: AuthSession["role"];
+  membershipStatus: "active" | "suspended";
+  teams: Team[];
+  createdAt: string;
+};
+
+export type Invitation = {
+  id: string;
+  email: string;
+  role: AuthSession["role"];
+  organizationName: string;
+  organizationSlug: string;
+  expiresAt: string;
+};
+
+export type CreatedInvitation = Invitation & { token: string };
+
 export type ServiceEnvironment = {
   id: string;
   name: string;
@@ -70,6 +126,7 @@ export type IncidentActivity = {
   message: string;
   fromValue: string | null;
   toValue: string | null;
+  actor: { id: string; displayName: string } | null;
   createdAt: string;
 };
 

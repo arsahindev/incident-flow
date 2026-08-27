@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { getIncidents, getServices, getTeams } from "@/lib/api";
+import { getIncidents, getServices, getTeams, requireSession } from "@/lib/api";
 import type { IncidentPriority, IncidentStatus } from "@/lib/types";
 
 import { PriorityBadge, StatusBadge } from "./ui/badges";
@@ -27,6 +27,7 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await connection();
+  const session = await requireSession();
   const search = await searchParams;
   const serviceId = one(search.serviceId);
   const teamId = one(search.teamId);
@@ -175,15 +176,21 @@ export default async function Home({
           ) : null}
         </section>
 
-        <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <h2 className="font-semibold">Create incident</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Record a service-impacting event for your team.
-          </p>
-          <div className="mt-6">
-            <CreateIncidentForm teams={teams} services={services} />
-          </div>
-        </aside>
+        {session.permissions.includes("incidents.manage") ? (
+          <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <h2 className="font-semibold">Create incident</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Record a service-impacting event for your team.
+            </p>
+            <div className="mt-6">
+              <CreateIncidentForm teams={teams} services={services} />
+            </div>
+          </aside>
+        ) : (
+          <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">
+            Your viewer role provides read-only incident access.
+          </aside>
+        )}
       </div>
     </main>
   );
