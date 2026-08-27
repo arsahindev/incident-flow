@@ -2,9 +2,9 @@
 
 IncidentFlow is a multi-tenant incident intake, routing, notification, and response-coordination SaaS for backend teams. It is being built as a production-minded full-stack portfolio project, one working vertical slice at a time.
 
-## Current milestone: Phase 1.5
+## Current milestone: Phase 2
 
-The manual incident lifecycle and service-catalog foundation are working locally:
+The authenticated manual incident lifecycle and service-catalog foundation are working locally:
 
 - a pnpm monorepo;
 - a Next.js dashboard with incident creation, listing, detail, lifecycle controls, and URL-backed filters;
@@ -14,9 +14,15 @@ The manual incident lifecycle and service-catalog foundation are working locally
 - Prisma migrations and an idempotent seed with a development organization, team, and realistic service catalog;
 - transactional incident activity history for creation, assignment, status, and affected-service changes;
 - PostgreSQL constraint tests and a GitHub Actions quality pipeline;
-- PostgreSQL in Docker Compose with a persistent named volume.
+- PostgreSQL in Docker Compose with a persistent named volume;
+- opaque, revocable server-managed sessions with Argon2id password hashing and login throttling;
+- users, organization/team memberships, invitations, organization switching, and actor-aware audit records;
+- centralized owner/admin/responder/viewer permissions enforced by the API and reflected in the UI;
+- cross-tenant IDOR, role-boundary, invitation, session-rotation/revocation, suspended-membership, and disabled-user integration tests;
+- shared Zod identity/session contracts and a stable coded API error envelope with request correlation IDs;
+- a tested native-fetch backend-for-frontend boundary covering `204`, network failures, malformed/non-JSON responses, and runtime response validation.
 
-Authentication, WebSockets, queues, AWS resources, and AI are intentionally deferred to their roadmap phases.
+WebSockets, queues, AWS resources, and AI are intentionally deferred to their roadmap phases.
 
 ## Prerequisites
 
@@ -40,7 +46,14 @@ The applications are then available at:
 - Web dashboard: <http://localhost:3000>
 - API health check: <http://localhost:4000/health>
 
-The development command runs the web and API packages together. To run either package alone:
+The idempotent development seed creates this local owner account:
+
+- Email: `admin@incidentflow.local`
+- Password: `IncidentFlow-Dev-2026!`
+
+These are local demonstration credentials only; do not deploy them to a shared environment.
+
+The development command runs the contracts compiler, web app, and API together. To run either application alone after `pnpm install`:
 
 ```bash
 pnpm --filter @incidentflow/web dev
@@ -74,7 +87,7 @@ Create and apply a development migration after editing the Prisma schema:
 pnpm db:migrate --name describe_your_change
 ```
 
-The seed command is idempotent and can safely restore the development organization, Platform team, services, and service environments:
+The seed command is idempotent and can safely restore the development organization, owner account, Platform team, services, and service environments:
 
 ```bash
 pnpm db:seed
@@ -98,6 +111,13 @@ incidentflow/
 └── pnpm-workspace.yaml
 ```
 
+## Architecture diagrams
+
+- [Identity and authorization ERD](diagrams/auth.svg)
+- [Incident and service-catalog ERD](diagrams/incident-and-service.svg)
+
 ## Next milestone
 
-Phase 2 will add authentication, users, organization memberships, roles, and server-side authorization checks. Until then, the API deliberately derives tenant context from the seeded development organization rather than trusting an organization ID from the browser.
+Phase 3 will add authenticated real-time incident coordination through an adapter boundary, organization/incident/user rooms, canonical-state refetch after reconnect, and focused socket integration tests.
+
+Phase 2 decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md) and [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md).

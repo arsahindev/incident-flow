@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildApp } from "../app.js";
+import { ownerTestAuthContext } from "../test-auth-context.js";
 import type { ServiceRepository } from "./repository.js";
 import type { CreateServiceInput, ServiceDetailRecord } from "./types.js";
 
@@ -66,7 +67,11 @@ function createRepository(overrides: Partial<ServiceRepository> = {}) {
 }
 
 test("service routes list and return catalog records", async () => {
-  const app = buildApp({ serviceRepository: createRepository(), logger: false });
+  const app = buildApp({
+    serviceRepository: createRepository(),
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
   const [listResponse, detailResponse] = await Promise.all([
     app.inject({ method: "GET", url: "/v1/services" }),
     app.inject({ method: "GET", url: `/v1/services/${serviceId}` }),
@@ -87,7 +92,11 @@ test("POST /v1/services validates and normalizes a service with environments", a
       return serviceFixture();
     },
   });
-  const app = buildApp({ serviceRepository: repository, logger: false });
+  const app = buildApp({
+    serviceRepository: repository,
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
 
   const invalidResponse = await app.inject({
     method: "POST",
@@ -129,7 +138,11 @@ test("service environment routes preserve service scoping", async () => {
       return serviceFixture().environments[0]!;
     },
   });
-  const app = buildApp({ serviceRepository: repository, logger: false });
+  const app = buildApp({
+    serviceRepository: repository,
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
   const response = await app.inject({
     method: "POST",
     url: `/v1/services/${serviceId}/environments`,
@@ -147,7 +160,11 @@ test("service environment routes preserve service scoping", async () => {
 });
 
 test("service environment routes reject expiry on non-ephemeral environments", async () => {
-  const app = buildApp({ serviceRepository: createRepository(), logger: false });
+  const app = buildApp({
+    serviceRepository: createRepository(),
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
   const invalidEnvironment = {
     name: "Production",
     slug: "production",
@@ -175,11 +192,11 @@ test("service environment routes reject expiry on non-ephemeral environments", a
   assert.equal(createResponse.statusCode, 400);
   assert.equal(updateResponse.statusCode, 400);
   assert.equal(
-    createResponse.json().issues[0].message,
+    createResponse.json().error.issues[0].message,
     "Only ephemeral environments may have an expiry time",
   );
   assert.equal(
-    updateResponse.json().issues[0].message,
+    updateResponse.json().error.issues[0].message,
     "Only ephemeral environments may have an expiry time",
   );
   await app.close();

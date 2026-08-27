@@ -36,11 +36,13 @@ export interface IncidentRepository {
   createIncident(
     organizationSlug: string,
     input: CreateIncidentInput,
+    actorUserId: string,
   ): Promise<IncidentDetailRecord>;
   updateIncident(
     organizationSlug: string,
     incidentId: string,
     input: UpdateIncidentInput,
+    actorUserId: string,
   ): Promise<IncidentDetailRecord>;
 }
 

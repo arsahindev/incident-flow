@@ -1,7 +1,25 @@
+import type {
+  AuthContext,
+  CreatedInvitation as SharedCreatedInvitation,
+  Invitation as SharedInvitation,
+  OrganizationAccess as SharedOrganizationAccess,
+  OrganizationMember as SharedOrganizationMember,
+  Permission as SharedPermission,
+  SessionResult as SharedSessionResult,
+  TeamSummary,
+} from "@incidentflow/contracts";
+
 export type IncidentStatus = "open" | "acknowledged" | "resolved";
 export type IncidentPriority = "low" | "medium" | "high" | "critical";
 
-export type Team = { id: string; name: string; slug: string };
+export type Team = TeamSummary;
+export type Permission = SharedPermission;
+export type AuthSession = AuthContext;
+export type OrganizationAccess = SharedOrganizationAccess;
+export type SessionResult = SharedSessionResult;
+export type OrganizationMember = SharedOrganizationMember;
+export type Invitation = SharedInvitation;
+export type CreatedInvitation = SharedCreatedInvitation;
 
 export type ServiceEnvironment = {
   id: string;
@@ -70,6 +88,7 @@ export type IncidentActivity = {
   message: string;
   fromValue: string | null;
   toValue: string | null;
+  actor: { id: string; displayName: string } | null;
   createdAt: string;
 };
 

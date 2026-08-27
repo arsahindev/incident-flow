@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { ApiError, getIncident, getServices, getTeams } from "@/lib/api";
+import { ApiError, getIncident, getServices, getTeams, requireSession } from "@/lib/api";
 
 import { PriorityBadge, StatusBadge } from "../../ui/badges";
 import { IncidentControls } from "../../ui/incident-controls";
@@ -20,6 +20,7 @@ export default async function IncidentPage({
   params: Promise<{ incidentId: string }>;
 }) {
   await connection();
+  const session = await requireSession();
   const { incidentId } = await params;
 
   let incidentResponse;
@@ -119,7 +120,10 @@ export default async function IncidentPage({
                   <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-400" />
                   <div>
                     <p className="text-sm text-slate-200">{entry.message}</p>
-                    <p className="mt-1 text-xs text-slate-500">{formatDate(entry.createdAt)}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatDate(entry.createdAt)}
+                      {entry.actor ? ` · ${entry.actor.displayName}` : " · system or legacy action"}
+                    </p>
                   </div>
                 </li>
               ))}
@@ -127,7 +131,8 @@ export default async function IncidentPage({
           </section>
         </div>
 
-        <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        {session.permissions.includes("incidents.manage") ? (
+          <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5">
           <h2 className="font-semibold">Coordinate response</h2>
           <p className="mt-1 text-sm text-slate-400">
             Update ownership and lifecycle state. Every change is recorded.
@@ -146,7 +151,8 @@ export default async function IncidentPage({
               }
             />
           </div>
-        </aside>
+          </aside>
+        ) : null}
       </div>
     </main>
   );

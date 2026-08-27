@@ -42,7 +42,10 @@ const incidentSummaryInclude = {
 
 const incidentDetailInclude = {
   ...incidentSummaryInclude,
-  activity: { orderBy: { createdAt: "desc" as const } },
+  activity: {
+    orderBy: { createdAt: "desc" as const },
+    include: { actor: { select: { id: true, displayName: true } } },
+  },
 } satisfies Prisma.IncidentInclude;
 
 type PrismaIncidentSummary = Prisma.IncidentGetPayload<{
@@ -105,6 +108,7 @@ function toDetail(incident: PrismaIncidentDetail): IncidentDetailRecord {
       message: entry.message,
       fromValue: entry.fromValue,
       toValue: entry.toValue,
+      actor: entry.actor,
       createdAt: entry.createdAt.toISOString(),
     })),
   };
@@ -166,8 +170,9 @@ export class PrismaIncidentRepository implements IncidentRepository {
   async createIncident(
     organizationSlug: string,
     input: CreateIncidentInput,
+    actorUserId: string,
   ) {
-    return this.prisma.$transaction(async (transaction) => {
+    const incidentId = await this.prisma.$transaction(async (transaction) => {
       const organization = await transaction.organization.findUnique({
         where: { slug: organizationSlug },
         select: { id: true },
@@ -211,6 +216,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
         data: {
           organizationId: organization.id,
           incidentId: incident.id,
+          actorUserId,
           type: "CREATED",
           message: `Incident created with ${priorityLabels[input.priority]} priority`,
           toValue: input.priority,
@@ -222,6 +228,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
           data: {
             organizationId: organization.id,
             incidentId: incident.id,
+            actorUserId,
             type: "TEAM_ASSIGNED",
             message: `Assigned to ${team.name}`,
             toValue: team.id,
@@ -233,26 +240,36 @@ export class PrismaIncidentRepository implements IncidentRepository {
         data: {
           organizationId: organization.id,
           incidentId: incident.id,
+          actorUserId,
           type: "AFFECTED_SERVICES_CHANGED",
           message: `Affected services set to ${services.map((service) => service.name).join(", ")}; primary: ${services.find((service) => service.id === (input.primaryServiceId ?? services[0]?.id))?.name}`,
           toValue: JSON.stringify(services.map((service) => service.id)),
         },
       });
 
-      return this.getIncidentInTransaction(
-        transaction,
-        organization.id,
-        incident.id,
-      );
+      await transaction.auditLog.create({
+        data: {
+          organizationId: organization.id,
+          actorUserId,
+          action: "incident.created",
+          entityType: "incident",
+          entityId: incident.id,
+          metadata: { priority: input.priority, serviceIds: input.serviceIds },
+        },
+      });
+
+      return incident.id;
     });
+    return this.getIncident(organizationSlug, incidentId);
   }
 
   async updateIncident(
     organizationSlug: string,
     incidentId: string,
     input: UpdateIncidentInput,
+    actorUserId: string,
   ) {
-    return this.prisma.$transaction(async (transaction) => {
+    await this.prisma.$transaction(async (transaction) => {
       const existing = await transaction.incident.findFirst({
         where: { id: incidentId, organization: { slug: organizationSlug } },
         include: incidentSummaryInclude,
@@ -274,6 +291,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
       const activity: Array<{
         organizationId: string;
         incidentId: string;
+        actorUserId: string;
         type: PrismaActivityType;
         message: string;
         fromValue: string | null;
@@ -286,6 +304,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
         activity.push({
           organizationId: existing.organizationId,
           incidentId,
+          actorUserId,
           type: "STATUS_CHANGED",
           message: `Status changed from ${statusLabels[currentStatus]} to ${statusLabels[input.status]}`,
           fromValue: currentStatus,
@@ -298,6 +317,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
         activity.push({
           organizationId: existing.organizationId,
           incidentId,
+          actorUserId,
           type: "TEAM_ASSIGNED",
           message: nextTeam ? `Assigned to ${nextTeam.name}` : "Team assignment removed",
           fromValue: existing.teamId,
@@ -342,6 +362,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
           activity.push({
             organizationId: existing.organizationId,
             incidentId,
+            actorUserId,
             type: "AFFECTED_SERVICES_CHANGED",
             message: `Affected services changed to ${nextServices
               .map((service) => service.name)
@@ -373,26 +394,20 @@ export class PrismaIncidentRepository implements IncidentRepository {
 
       if (activity.length > 0) {
         await transaction.incidentActivity.createMany({ data: activity });
+        await transaction.auditLog.create({
+          data: {
+            organizationId: existing.organizationId,
+            actorUserId,
+            action: "incident.updated",
+            entityType: "incident",
+            entityId: incidentId,
+            metadata: JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue,
+          },
+        });
       }
 
-      return this.getIncidentInTransaction(
-        transaction,
-        existing.organizationId,
-        incidentId,
-      );
     });
-  }
-
-  private async getIncidentInTransaction(
-    transaction: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
-    organizationId: string,
-    incidentId: string,
-  ) {
-    const incident = await transaction.incident.findUniqueOrThrow({
-      where: { organizationId_id: { organizationId, id: incidentId } },
-      include: incidentDetailInclude,
-    });
-    return toDetail(incident);
+    return this.getIncident(organizationSlug, incidentId);
   }
 
   private async getAffectedServices(

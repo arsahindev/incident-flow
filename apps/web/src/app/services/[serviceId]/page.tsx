@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { archiveServiceAction, archiveServiceEnvironmentAction } from "@/app/actions";
-import { ApiError, getService, getTeams } from "@/lib/api";
+import { ApiError, getService, getTeams, requireSession } from "@/lib/api";
 
 import { PriorityBadge, StatusBadge } from "../../ui/badges";
 import { CreateEnvironmentForm } from "../../ui/create-environment-form";
@@ -21,6 +21,7 @@ export default async function ServicePage({
   searchParams: Promise<{ updated?: string }>;
 }) {
   await connection();
+  const session = await requireSession();
   const { serviceId } = await params;
   const { updated } = await searchParams;
   let service;
@@ -69,7 +70,7 @@ export default async function ServicePage({
                       <p className="font-medium">{environment.name}</p>
                       <p className="mt-1 text-xs text-slate-500">{environment.kind}{environment.isEphemeral ? " · ephemeral" : ""} · {environment.status}</p>
                     </div>
-                    {environment.status === "active" ? <form action={archiveAction}><button className="text-sm text-slate-400 hover:text-red-300">Archive</button></form> : null}
+                    {environment.status === "active" && session.permissions.includes("services.manage") ? <form action={archiveAction}><button className="text-sm text-slate-400 hover:text-red-300">Archive</button></form> : null}
                   </li>
                 );
               })}
@@ -90,7 +91,8 @@ export default async function ServicePage({
             )}
           </section>
         </div>
-        <aside className="space-y-6">
+        {session.permissions.includes("services.manage") ? (
+          <aside className="space-y-6">
           <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
             <h2 className="font-semibold">Service settings</h2>
             <div className="mt-6"><ServiceSettingsForm service={service} teams={teams} /></div>
@@ -105,7 +107,8 @@ export default async function ServicePage({
             <p className="mt-1 text-sm text-slate-400">Archived services cannot be selected for new incidents.</p>
             <form action={archiveAction} className="mt-4"><button className="w-full rounded-lg border border-red-700/60 px-4 py-2 text-sm text-red-200">Archive service</button></form>
           </section>
-        </aside>
+          </aside>
+        ) : null}
       </div>
     </main>
   );

@@ -169,7 +169,7 @@ incident_alerts
 
 ### 1. Manual incident lifecycle — first vertical slice
 
-1. A user signs in (initially a seeded development organization may be used before authentication is built).
+1. A user signs in and selects an organization through a revocable server-managed session.
 2. The user creates an incident and identifies priority, owning/coordinating team, and affected service(s) as those capabilities become available.
 3. The incident is persisted in PostgreSQL.
 4. The dashboard lists the incident and shows its detail page/activity timeline.
@@ -458,6 +458,7 @@ Use a pnpm workspace. Do not add Turborepo or another orchestrator at the start;
 |---|---|---|
 | Web app | Next.js, TypeScript, Tailwind | Current, employable frontend stack; familiar to Ali. |
 | API | Fastify, TypeScript, Zod | Keeps the HTTP/webhook architecture explicit and provides a focused Node refresh. |
+| Internal web-to-API HTTP | Native `fetch` plus a small tested response parser | Next.js already integrates with `fetch`; a focused wrapper supplies typed errors and runtime contracts without Axios-level abstraction. |
 | Database/ORM | PostgreSQL and Prisma | Ali has used Prisma; use it to refresh rather than learn another ORM. |
 | Local database | PostgreSQL in Docker Compose | Simple, reproducible local development. |
 | Managed initial cloud DB | Neon PostgreSQL | Low operations; keeps early AWS learning focused on queues/storage/infrastructure. |
@@ -478,6 +479,8 @@ Keep HTTP, domain/application logic, persistence, and external transports separa
 - Application/domain services own incident transitions, authorization-relevant invariants, affected-service rules, timeline creation, and transactional behavior.
 - Repository interfaces hide Prisma where a seam materially improves testing or future transport changes; do not wrap every ORM call mechanically.
 - Shared Zod contracts define public API/event boundaries. Generated Prisma types are persistence types and must not become the public contract by accident.
+- `packages/contracts` owns the coded error envelope and the first runtime-validated identity/session response schemas. Migrate incident, service, event, and realtime contracts there incrementally when those boundaries change; do not create a speculative all-domain schema rewrite.
+- The Next.js backend-for-frontend uses native `fetch`. Its shared parser consumes a response body once, handles `204`, rejects malformed or contract-invalid success responses, safely classifies non-JSON failures, and preserves HTTP status, stable error code, validation issues, and request ID in `ApiError`.
 - Domain changes and their activity/outbox records should be committed atomically where consistency requires it.
 - External effects—notifications, webhooks, AI calls, email, WebSockets, and broker publishing—must not occur inside a database transaction.
 - Preserve ports for realtime publishing, event publishing, notification delivery, object storage, clock/ID generation where deterministic tests or provider replacement justify them.
@@ -532,6 +535,7 @@ These are ongoing acceptance criteria, not one final “hardening sprint.” App
 
 - Validate path, query, headers, and bodies with strict schemas; enforce maximum sizes and reject unknown/unsafe shapes where appropriate.
 - Centralize safe error mapping; do not leak stack traces, connection details, secrets, or raw provider responses.
+- API failures use `{ error: { code, message, issues?, requestId } }`; every response exposes the same request ID in `X-Request-Id`. UI behavior should branch on stable codes/status rather than matching human-readable messages.
 - Use secure cookies or carefully scoped tokens, CSRF protection where cookie authentication requires it, password hashing through an established library, session rotation/revocation, and login rate limiting.
 - Apply HMAC verification to raw webhook bytes, timing-safe comparison, replay windows, secret rotation, and idempotency constraints.
 - Validate outbound destinations and defend against SSRF, DNS rebinding, private/link-local addresses, redirect abuse, and oversized/slow responses.
@@ -858,7 +862,7 @@ Each phase must produce a demonstrable user or operator outcome, include tests p
 - Dashboard incident summary/list, creation form, detail view, status/team controls, loading/error/not-found states.
 - Browser-level lifecycle verification and PostgreSQL container-restart persistence verification.
 
-Known intentional limitation: tenant context is temporarily derived from a fixed seeded development organization until Phase 2 authentication. Do not mistake this for production authorization.
+The earlier fixed-development-tenant limitation was removed in Phase 2. Protected API operations now require authenticated, server-derived tenant context.
 
 ### Phase 1.5 — service catalog and affected services (complete)
 
@@ -897,16 +901,19 @@ Implemented outcome: the organization has a service catalog with service-owned e
 
 Do not add dependency graphs, automatic priority mapping, broad CMDB fields, or status-page publishing yet. Preserve seams for those later capabilities.
 
-### Phase 2 — identity, memberships, and authorization
+### Phase 2 — identity, memberships, and authorization (complete)
 
-- Select and document the authentication approach deliberately; prefer secure server-managed sessions for the web app unless another client requirement justifies tokens.
-- Add users, organization memberships, team memberships, roles, invitation/onboarding, session records/revocation, and disabled-user behavior.
-- Define a permission matrix such as organization owner/admin, responder/member, and read-only stakeholder/viewer. Avoid hard-coding scattered role-name comparisons; authorize named actions.
-- Replace the fixed development-organization context with authenticated tenant context.
-- Enforce authorization in application/API services for organizations, teams, services, incidents, and administrative actions.
-- Secure cookies, CSRF defense where required, password hashing or external identity provider integration, login throttling, session rotation, logout/revocation, and safe error responses.
-- Audit actor identity for incident/service/permission changes.
-- Test cross-tenant IDOR attempts, role boundaries, revoked sessions, invitations, and disabled accounts.
+- Opaque server-managed sessions use random bearer secrets while PostgreSQL stores only SHA-256 digests. The Next.js backend-for-frontend keeps the secret in an `HttpOnly`, `SameSite=Lax`, production-`Secure` cookie and forwards it to Fastify through a non-ambient authorization header. See `docs/decisions/0001-server-managed-sessions.md`.
+- Users, organization memberships, team memberships, invitations, session revocation, organization switching, organization-local suspension, and global disabled-user behavior are implemented through an additive migration and idempotent development seed.
+- A centralized named-action permission matrix defines owner, admin, responder, and viewer access. API checks are authoritative; the web UI also removes controls users cannot exercise.
+- All protected routes derive organization/user context from the validated session. The former fixed development organization is no longer an authorization mechanism.
+- Argon2id passwords, generic invalid-login responses, database-backed failure throttling, seven-day expiry, logout revocation, organization-switch rotation, hashed single-use 48-hour invitation tokens, and a last-active-owner invariant form the initial security baseline.
+- Because the browser never authenticates directly to Fastify with ambient cookies, cross-site requests cannot carry API authority. Next.js Server Actions provide the cookie-authenticated mutation boundary and same-origin validation; any future conventional cookie-authenticated route must add explicit CSRF protection.
+- Incident/service/activity/permission changes record actor identity and material organization administration actions also write audit-log records.
+- Real-PostgreSQL tests cover cross-tenant IDOR attempts, viewer write denial, invitations, team membership, last-owner protection, organization-switch token rotation, membership suspension/revocation, disabled users, and login throttling.
+- `packages/contracts` now provides runtime Zod identity/session schemas and the common coded API error envelope. Fastify maps expected and unexpected failures centrally with correlation IDs and without leaking internal details.
+- The Next.js backend-for-frontend deliberately keeps native `fetch`; its tested response parser handles no-content, malformed/empty JSON, non-JSON upstream failures, network failure classification, and structured `ApiError` metadata. Identity/session/member responses are runtime-validated first, while incident/service response contracts will migrate incrementally.
+- Deliberately deferred identity capabilities include password reset/change, MFA, enterprise SSO, personal API tokens, and end-user session-device management.
 
 ### Phase 3 — real-time incident coordination
 
@@ -1021,22 +1028,25 @@ Describe this milestone as ITIL-aligned, not certified.
 
 ---
 
-## Current code state — 2026-08-15
+## Current code state — 2026-08-27
 
 - Repository: `/Users/arsahin/Developer/incidentflow`.
-- Git is initialized. At the time of this handoff, the checked-out branch is `phase_1_5`; always inspect current branch/status before modifying files.
-- Phase 0 foundation, Phase 1 manual incident lifecycle, and Phase 1.5 service catalog/affected services are implemented. The Phase 1.5 working tree has not been committed or pushed unless later Git history says otherwise.
+- Git is initialized. At the time of this handoff, the checked-out branch is `phase_2`; always inspect current branch/status before modifying files.
+- Phase 0 foundation, Phase 1 manual incident lifecycle, Phase 1.5 service catalog/affected services, and Phase 2 identity/authorization are implemented on `phase_2` in focused commits. Inspect Git history and PR state before assuming they are merged to `main`.
 - Phase 1 baseline commit: `e43f355 feat: complete phase 1 manual incident lifecycle`.
-- pnpm workspace contains `apps/web`, `apps/api`, and the placeholder `packages/contracts`.
-- Next.js dashboard supports incident creation/list/detail, status/team/affected-service updates, activity history, URL-backed filtering, pagination, and service catalog/detail/environment management.
-- Fastify API exposes health, team, service, service-environment, and incident lifecycle routes with Zod validation and repository seams.
-- Prisma/PostgreSQL includes organizations, teams, services, service environments, incidents, affected-service joins, and incident activity. Organization-scoped composite constraints prevent cross-tenant affected-service references, and a partial unique index permits at most one primary service per incident.
-- The idempotent seed creates the development organization, Platform team, five representative services, and realistic environments.
+- pnpm workspace contains `apps/web`, `apps/api`, and the active `packages/contracts` package. The contracts package builds shared ESM/Zod identity and error contracts before dependent applications.
+- Next.js dashboard supports login/logout, invitation acceptance, member/role/access/team administration, permission-aware incident/service workflows, activity history, URL-backed filtering, pagination, and service catalog/detail/environment management.
+- Fastify API exposes health, authentication/session, invitation/member/team-access, service, service-environment, and incident lifecycle routes with Zod validation and repository seams.
+- Prisma/PostgreSQL includes users, organization/team memberships, sessions, invitations, login throttles, audit logs, organizations, teams, services, service environments, incidents, affected-service joins, and actor-aware incident activity. Organization-scoped constraints protect tenant boundaries.
+- The idempotent seed creates the development organization, an owner (`admin@incidentflow.local`), Platform team, five representative services, and realistic environments. Its local-only password is documented in the README.
+- The API resolves active user and organization membership on every protected request from a hashed opaque-session record. Central named permissions replace scattered role comparisons; suspended memberships, disabled users, expired sessions, and revoked sessions fail closed.
+- The web uses an HttpOnly cookie only as a backend-for-frontend credential; Fastify does not accept browser ambient cookies. The optimistic Next.js proxy checks cookie presence, while the API remains authoritative and safely handles stale/invalid cookies.
+- Auth/security decisions and deliberate deferrals are recorded in ADR 0001.
+- Native-fetch response handling, runtime contract validation, and the coded correlated-error format are recorded in ADR 0002.
 - Baseline GitHub Actions CI provisions PostgreSQL and runs frozen installation, migration deployment, lint, typecheck, unit tests, database integration tests, production build, and a high-severity production-dependency audit.
-- PostgreSQL runs through Docker Compose with persistent storage. Phase 1.5 was verified through lint, standalone typecheck, unit/API tests, real-PostgreSQL constraint tests, production builds, dependency audit, browser interaction, service filtering, and incident primary-service changes.
-- The database contains development records created during verification, including an Order Routing API service, preview environment, and linked incident; do not assume it is empty.
-- Authentication is not implemented. API tenant context still uses the seeded development organization and is not production authorization.
-- Phase 2 identity, memberships, roles, sessions, and server-side authorization is the recommended next milestone.
+- PostgreSQL runs through Docker Compose with persistent storage. Phase 2 was verified through lint, standalone typecheck, shared-contract/API/web-wrapper tests, warning-free real-PostgreSQL identity/authorization and constraint tests, production builds, a high-severity production-dependency audit, and a browser journey covering login, invitation/onboarding, owner administration, viewer UI restrictions, direct admin-page denial, and logout.
+- The database contains development records created during verification, including an Order Routing API service, preview environment, linked incident, and a browser-verification viewer account; do not assume it is empty.
+- Phase 3 authenticated real-time incident coordination is the recommended next milestone. Do not begin it until the user approves the next phase.
 - Existing uncommitted user changes may be present. Always inspect and preserve them; never treat a dirty worktree as disposable.
 
 ### Local development
@@ -1072,13 +1082,14 @@ pnpm audit --prod --audit-level high
 ## Immediate open tasks for the coding assistant
 
 1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
-2. Review the completed Phase 1.5 diff with the user, then commit and push it only when explicitly requested.
-3. Begin Phase 2 by documenting the authentication/session choice and a named-action permission matrix before schema/UI implementation.
-4. Add users, organization memberships, team memberships, invitations, roles, sessions/revocation, and actor-aware audit records through a migration and idempotent development seed.
-5. Replace the fixed development tenant with authenticated server-derived organization context and enforce tenant/role authorization across incidents, services, environments, and teams.
-6. Test cross-tenant IDOR attempts, role boundaries, CSRF/session behavior, revoked/disabled users, and invitation flows against real PostgreSQL where appropriate.
-7. Keep the milestone local and runnable. Do not jump to WebSockets, AWS, queues, AI, Kafka, or on-call before their prerequisites work.
-8. Update this context, README, migration documentation, and roadmap status when Phase 2 is complete.
+2. Confirm whether the completed `phase_2` pull request has merged; do not build Phase 3 on an obsolete or unmerged base.
+3. Begin Phase 3 only with user approval, preferably in a fresh task: introduce a `RealtimePublisher` abstraction before Socket.IO enters application/domain code.
+4. Authenticate socket connections from the existing session system and authorize organization, incident, and user room joins server-side.
+5. Publish incident creation/status/assignment/affected-service/activity changes; reconnecting clients must refetch canonical API state and reject stale updates using version/sequence information.
+6. Add payload/backpressure limits, connection/room metrics, revocation/disconnect behavior, a no-op test publisher, and selected socket integration tests.
+7. Continue migrating endpoint success schemas into `packages/contracts` when their APIs are actively changed; keep the stable coded error contract centralized.
+8. Keep the milestone local and runnable. Do not jump to webhooks, AWS, queues, AI, Kafka, notifications, or on-call before their roadmap phases.
+9. Keep this context, README, ADRs, and roadmap status synchronized with implemented behavior.
 
 ## Working preferences for the coding assistant
 

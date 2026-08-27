@@ -30,6 +30,7 @@ export type IncidentActivityRecord = {
   message: string;
   fromValue: string | null;
   toValue: string | null;
+  actor: { id: string; displayName: string } | null;
   createdAt: string;
 };
 

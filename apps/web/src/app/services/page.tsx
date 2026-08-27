@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { getServices, getTeams } from "@/lib/api";
+import { getServices, getTeams, requireSession } from "@/lib/api";
 
 import { CreateServiceForm } from "../ui/create-service-form";
 
 export default async function ServicesPage() {
   await connection();
+  const session = await requireSession();
   const [{ services }, { teams }] = await Promise.all([getServices(), getTeams()]);
 
   return (
@@ -35,11 +36,13 @@ export default async function ServicesPage() {
           ))}
           {services.length === 0 ? <p className="text-slate-400">No services yet.</p> : null}
         </section>
-        <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <h2 className="font-semibold">Create service</h2>
-          <p className="mt-1 text-sm text-slate-400">Add an operational capability and its initial environments.</p>
-          <div className="mt-6"><CreateServiceForm teams={teams} /></div>
-        </aside>
+        {session.permissions.includes("services.manage") ? (
+          <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <h2 className="font-semibold">Create service</h2>
+            <p className="mt-1 text-sm text-slate-400">Add an operational capability and its initial environments.</p>
+            <div className="mt-6"><CreateServiceForm teams={teams} /></div>
+          </aside>
+        ) : null}
       </div>
     </main>
   );
