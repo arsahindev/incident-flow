@@ -1,4 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import { hash } from "@node-rs/argon2";
 import { config } from "dotenv";
 
 import { PrismaClient } from "../src/generated/prisma/client.js";
@@ -21,6 +22,13 @@ const platformTeam = {
   id: "22222222-2222-4222-8222-222222222222",
   name: "Platform",
   slug: "platform",
+};
+
+const developmentOwner = {
+  id: "88888888-8888-4888-8888-888888888888",
+  email: "admin@incidentflow.local",
+  displayName: "IncidentFlow Admin",
+  password: "IncidentFlow-Dev-2026!",
 };
 
 const services = [
@@ -89,6 +97,52 @@ async function main() {
     create: {
       ...platformTeam,
       organizationId: organization.id,
+    },
+  });
+
+  const passwordHash = await hash(developmentOwner.password, {
+    memoryCost: 19_456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+  const owner = await prisma.user.upsert({
+    where: { email: developmentOwner.email },
+    update: {
+      displayName: developmentOwner.displayName,
+      passwordHash,
+      status: "ACTIVE",
+    },
+    create: {
+      id: developmentOwner.id,
+      email: developmentOwner.email,
+      displayName: developmentOwner.displayName,
+      passwordHash,
+    },
+  });
+  await prisma.organizationMembership.upsert({
+    where: {
+      organizationId_userId: { organizationId: organization.id, userId: owner.id },
+    },
+    update: { role: "OWNER", status: "ACTIVE" },
+    create: {
+      organizationId: organization.id,
+      userId: owner.id,
+      role: "OWNER",
+    },
+  });
+  await prisma.teamMembership.upsert({
+    where: {
+      organizationId_teamId_userId: {
+        organizationId: organization.id,
+        teamId: team.id,
+        userId: owner.id,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      teamId: team.id,
+      userId: owner.id,
     },
   });
 

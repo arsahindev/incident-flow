@@ -13,7 +13,6 @@ const environmentSchema = z.object({
     .default(
       "postgresql://incidentflow:incidentflow_dev@localhost:5432/incidentflow",
     ),
-  DEVELOPMENT_ORGANIZATION_SLUG: z.string().min(1).default("incidentflow-dev"),
 });
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env) {

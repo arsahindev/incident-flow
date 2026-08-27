@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 
 import { buildApp } from "./app.js";
+import { permissionsForRole } from "./auth/permissions.js";
 import { createPrismaClient } from "./database.js";
 import { PrismaIncidentRepository } from "./incidents/prisma-repository.js";
 
@@ -146,7 +147,17 @@ test(
     const organizationBSlug = `api-tenant-b-${organizationB}`;
     const app = buildApp({
       incidentRepository: new PrismaIncidentRepository(prisma),
-      organizationSlug: organizationBSlug,
+      testAuthContext: {
+        sessionId: randomUUID(),
+        userId: randomUUID(),
+        email: "tenant-b-owner@example.com",
+        displayName: "Tenant B Owner",
+        organizationId: organizationB,
+        organizationSlug: organizationBSlug,
+        organizationName: "API tenant B",
+        role: "owner",
+        permissions: permissionsForRole("owner"),
+      },
       logger: false,
     });
 

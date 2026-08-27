@@ -14,21 +14,25 @@ export interface ServiceRepository {
   createService(
     organizationSlug: string,
     input: CreateServiceInput,
+    actorUserId: string,
   ): Promise<ServiceDetailRecord>;
   updateService(
     organizationSlug: string,
     serviceId: string,
     input: UpdateServiceInput,
+    actorUserId: string,
   ): Promise<ServiceDetailRecord>;
   createEnvironment(
     organizationSlug: string,
     serviceId: string,
     input: CreateServiceEnvironmentInput,
+    actorUserId: string,
   ): Promise<ServiceEnvironmentRecord>;
   updateEnvironment(
     organizationSlug: string,
     serviceId: string,
     environmentId: string,
     input: UpdateServiceEnvironmentInput,
+    actorUserId: string,
   ): Promise<ServiceEnvironmentRecord>;
 }

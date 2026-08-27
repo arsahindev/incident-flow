@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { ZodError } from "zod";
 
+import { requirePermission } from "../auth/permissions.js";
 import type { IncidentRepository } from "./repository.js";
 import {
   createIncidentSchema,
@@ -11,7 +12,6 @@ import {
 
 type IncidentRouteOptions = {
   repository: IncidentRepository;
-  organizationSlug: string;
 };
 
 function sendValidationError(reply: FastifyReply, error: ZodError) {
@@ -28,39 +28,48 @@ export async function registerIncidentRoutes(
   app: FastifyInstance,
   options: IncidentRouteOptions,
 ) {
-  const { repository, organizationSlug } = options;
+  const { repository } = options;
 
-  app.get("/v1/teams", async () => ({
-    teams: await repository.listTeams(organizationSlug),
-  }));
+  app.get("/v1/teams", async (request) => {
+    requirePermission(request.auth, "teams.read");
+    return { teams: await repository.listTeams(request.auth.organizationSlug) };
+  });
 
   app.get("/v1/incidents", async (request, reply) => {
+    requirePermission(request.auth, "incidents.read");
     const query = listIncidentsQuerySchema.safeParse(request.query);
     if (!query.success) return sendValidationError(reply, query.error);
-    return repository.listIncidents(organizationSlug, query.data);
+    return repository.listIncidents(request.auth.organizationSlug, query.data);
   });
 
   app.post("/v1/incidents", async (request, reply) => {
+    requirePermission(request.auth, "incidents.manage");
     const parsed = createIncidentSchema.safeParse(request.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);
 
-    const incident = await repository.createIncident(organizationSlug, parsed.data);
+    const incident = await repository.createIncident(
+      request.auth.organizationSlug,
+      parsed.data,
+      request.auth.userId,
+    );
     return reply.code(201).send({ incident });
   });
 
   app.get("/v1/incidents/:incidentId", async (request, reply) => {
+    requirePermission(request.auth, "incidents.read");
     const params = incidentIdParamsSchema.safeParse(request.params);
     if (!params.success) return sendValidationError(reply, params.error);
 
     return {
       incident: await repository.getIncident(
-        organizationSlug,
+        request.auth.organizationSlug,
         params.data.incidentId,
       ),
     };
   });
 
   app.patch("/v1/incidents/:incidentId", async (request, reply) => {
+    requirePermission(request.auth, "incidents.manage");
     const params = incidentIdParamsSchema.safeParse(request.params);
     if (!params.success) return sendValidationError(reply, params.error);
 
@@ -69,9 +78,10 @@ export async function registerIncidentRoutes(
 
     return {
       incident: await repository.updateIncident(
-        organizationSlug,
+        request.auth.organizationSlug,
         params.data.incidentId,
         body.data,
+        request.auth.userId,
       ),
     };
   });

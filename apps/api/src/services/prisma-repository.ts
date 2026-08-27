@@ -185,7 +185,11 @@ export class PrismaServiceRepository implements ServiceRepository {
     return toServiceDetail(service);
   }
 
-  async createService(organizationSlug: string, input: CreateServiceInput) {
+  async createService(
+    organizationSlug: string,
+    input: CreateServiceInput,
+    actorUserId: string,
+  ) {
     try {
       return await this.prisma.$transaction(async (transaction) => {
         const organization = await transaction.organization.findUnique({
@@ -220,6 +224,17 @@ export class PrismaServiceRepository implements ServiceRepository {
           })),
         });
 
+        await transaction.auditLog.create({
+          data: {
+            organizationId: organization.id,
+            actorUserId,
+            action: "service.created",
+            entityType: "service",
+            entityId: service.id,
+            metadata: { name: input.name, type: input.type, tier: input.tier },
+          },
+        });
+
         return this.getServiceInTransaction(transaction, organization.id, service.id);
       });
     } catch (error) {
@@ -236,6 +251,7 @@ export class PrismaServiceRepository implements ServiceRepository {
     organizationSlug: string,
     serviceId: string,
     input: UpdateServiceInput,
+    actorUserId: string,
   ) {
     try {
       return await this.prisma.$transaction(async (transaction) => {
@@ -277,6 +293,17 @@ export class PrismaServiceRepository implements ServiceRepository {
           });
         }
 
+        await transaction.auditLog.create({
+          data: {
+            organizationId: existing.organizationId,
+            actorUserId,
+            action: input.archived ? "service.archived" : "service.updated",
+            entityType: "service",
+            entityId: serviceId,
+            metadata: JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue,
+          },
+        });
+
         return this.getServiceInTransaction(
           transaction,
           existing.organizationId,
@@ -295,29 +322,42 @@ export class PrismaServiceRepository implements ServiceRepository {
     organizationSlug: string,
     serviceId: string,
     input: CreateServiceEnvironmentInput,
+    actorUserId: string,
   ) {
     try {
-      const service = await this.prisma.service.findFirst({
-        where: { id: serviceId, organization: { slug: organizationSlug } },
-        select: { id: true, organizationId: true, archivedAt: true },
-      });
-      if (!service) throw new ResourceNotFoundError("Service");
-      if (service.archivedAt) {
-        throw new ResourceConflictError("Archived services cannot add environments");
-      }
+      return await this.prisma.$transaction(async (transaction) => {
+        const service = await transaction.service.findFirst({
+          where: { id: serviceId, organization: { slug: organizationSlug } },
+          select: { id: true, organizationId: true, archivedAt: true },
+        });
+        if (!service) throw new ResourceNotFoundError("Service");
+        if (service.archivedAt) {
+          throw new ResourceConflictError("Archived services cannot add environments");
+        }
 
-      const environment = await this.prisma.serviceEnvironment.create({
-        data: {
-          organizationId: service.organizationId,
-          serviceId,
-          name: input.name,
-          slug: input.slug,
-          kind: environmentKindToPrisma[input.kind],
-          isEphemeral: input.isEphemeral,
-          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-        },
+        const environment = await transaction.serviceEnvironment.create({
+          data: {
+            organizationId: service.organizationId,
+            serviceId,
+            name: input.name,
+            slug: input.slug,
+            kind: environmentKindToPrisma[input.kind],
+            isEphemeral: input.isEphemeral,
+            expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+          },
+        });
+        await transaction.auditLog.create({
+          data: {
+            organizationId: service.organizationId,
+            actorUserId,
+            action: "service_environment.created",
+            entityType: "service_environment",
+            entityId: environment.id,
+            metadata: { serviceId, name: input.name, kind: input.kind },
+          },
+        });
+        return toEnvironment(environment);
       });
-      return toEnvironment(environment);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ResourceConflictError(
@@ -333,44 +373,57 @@ export class PrismaServiceRepository implements ServiceRepository {
     serviceId: string,
     environmentId: string,
     input: UpdateServiceEnvironmentInput,
+    actorUserId: string,
   ) {
     try {
-      const existing = await this.prisma.serviceEnvironment.findFirst({
-        where: {
-          id: environmentId,
-          serviceId,
-          organization: { slug: organizationSlug },
-        },
-      });
-      if (!existing) throw new ResourceNotFoundError("Service environment");
+      return await this.prisma.$transaction(async (transaction) => {
+        const existing = await transaction.serviceEnvironment.findFirst({
+          where: {
+            id: environmentId,
+            serviceId,
+            organization: { slug: organizationSlug },
+          },
+        });
+        if (!existing) throw new ResourceNotFoundError("Service environment");
 
-      const nextIsEphemeral = input.isEphemeral ?? existing.isEphemeral;
-      const nextExpiresAt =
-        input.expiresAt === undefined
-          ? existing.expiresAt
-          : input.expiresAt
-            ? new Date(input.expiresAt)
-            : null;
-      if (!nextIsEphemeral && nextExpiresAt) {
-        throw new ResourceConflictError(
-          "Only ephemeral environments may have an expiry time",
-        );
-      }
+        const nextIsEphemeral = input.isEphemeral ?? existing.isEphemeral;
+        const nextExpiresAt =
+          input.expiresAt === undefined
+            ? existing.expiresAt
+            : input.expiresAt
+              ? new Date(input.expiresAt)
+              : null;
+        if (!nextIsEphemeral && nextExpiresAt) {
+          throw new ResourceConflictError(
+            "Only ephemeral environments may have an expiry time",
+          );
+        }
 
-      const environment = await this.prisma.serviceEnvironment.update({
-        where: { id: environmentId },
-        data: {
-          name: input.name,
-          slug: input.slug,
-          kind: input.kind ? environmentKindToPrisma[input.kind] : undefined,
-          isEphemeral: input.isEphemeral,
-          expiresAt: nextExpiresAt,
-          status: input.status
-            ? environmentStatusToPrisma[input.status]
-            : undefined,
-        },
+        const environment = await transaction.serviceEnvironment.update({
+          where: { id: environmentId },
+          data: {
+            name: input.name,
+            slug: input.slug,
+            kind: input.kind ? environmentKindToPrisma[input.kind] : undefined,
+            isEphemeral: input.isEphemeral,
+            expiresAt: nextExpiresAt,
+            status: input.status
+              ? environmentStatusToPrisma[input.status]
+              : undefined,
+          },
+        });
+        await transaction.auditLog.create({
+          data: {
+            organizationId: existing.organizationId,
+            actorUserId,
+            action: "service_environment.updated",
+            entityType: "service_environment",
+            entityId: environmentId,
+            metadata: JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue,
+          },
+        });
+        return toEnvironment(environment);
       });
-      return toEnvironment(environment);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ResourceConflictError(

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildApp } from "../app.js";
+import { ownerTestAuthContext } from "../test-auth-context.js";
 import {
   ResourceNotFoundError,
   type IncidentRepository,
@@ -46,6 +47,7 @@ function incidentFixture(): IncidentDetailRecord {
         message: "Incident created with High priority",
         fromValue: null,
         toValue: "high",
+        actor: null,
         createdAt: "2026-08-08T12:00:00.000Z",
       },
     ],
@@ -78,7 +80,11 @@ function createRepository(overrides: Partial<IncidentRepository> = {}) {
 }
 
 test("incident routes expose the development tenant's teams and incidents", async () => {
-  const app = buildApp({ incidentRepository: createRepository(), logger: false });
+  const app = buildApp({
+    incidentRepository: createRepository(),
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
 
   const [teamsResponse, incidentsResponse] = await Promise.all([
     app.inject({ method: "GET", url: "/v1/teams" }),
@@ -104,7 +110,11 @@ test("GET /v1/incidents validates and forwards catalog filters and pagination", 
       };
     },
   });
-  const app = buildApp({ incidentRepository: repository, logger: false });
+  const app = buildApp({
+    incidentRepository: repository,
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
 
   const response = await app.inject({
     method: "GET",
@@ -136,7 +146,11 @@ test("POST /v1/incidents validates and normalizes its input", async () => {
       return incidentFixture();
     },
   });
-  const app = buildApp({ incidentRepository: repository, logger: false });
+  const app = buildApp({
+    incidentRepository: repository,
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
 
   const invalidResponse = await app.inject({
     method: "POST",
@@ -173,7 +187,11 @@ test("PATCH /v1/incidents/:id accepts lifecycle changes and maps missing records
       return { ...incidentFixture(), status: input.status ?? "open" };
     },
   });
-  const app = buildApp({ incidentRepository: repository, logger: false });
+  const app = buildApp({
+    incidentRepository: repository,
+    testAuthContext: ownerTestAuthContext,
+    logger: false,
+  });
 
   const response = await app.inject({
     method: "PATCH",
@@ -185,6 +203,7 @@ test("PATCH /v1/incidents/:id accepts lifecycle changes and maps missing records
 
   const missingApp = buildApp({
     logger: false,
+    testAuthContext: ownerTestAuthContext,
     incidentRepository: createRepository({
       async getIncident() {
         throw new ResourceNotFoundError("Incident");
