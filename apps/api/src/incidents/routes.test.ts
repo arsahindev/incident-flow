@@ -215,7 +215,9 @@ test("PATCH /v1/incidents/:id accepts lifecycle changes and maps missing records
     url: `/v1/incidents/${incidentId}`,
   });
   assert.equal(missingResponse.statusCode, 404);
-  assert.deepEqual(missingResponse.json(), { error: "Incident was not found" });
+  assert.equal(missingResponse.json().error.code, "not_found");
+  assert.equal(missingResponse.json().error.message, "Incident was not found");
+  assert.ok(missingResponse.json().error.requestId);
 
   await app.close();
   await missingApp.close();

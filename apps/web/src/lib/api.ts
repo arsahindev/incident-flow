@@ -1,33 +1,29 @@
 import "server-only";
 
+import {
+  authSessionResponseSchema,
+  invitationResponseSchema,
+  membersResponseSchema,
+  organizationsResponseSchema,
+} from "@incidentflow/contracts";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import type { ZodType } from "zod";
 
 import type {
-  AuthSession,
   IncidentDetail,
   IncidentPagination,
   IncidentPriority,
   IncidentStatus,
   IncidentSummary,
-  Invitation,
-  OrganizationMember,
-  OrganizationAccess,
   Service,
   ServiceDetail,
   Team,
 } from "./types";
 import { sessionCookieName } from "./auth-constants";
+import { ApiError, parseApiResponse } from "./api-response";
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
+export { ApiError } from "./api-response";
 
 function apiUrl(path: string) {
   const baseUrl =
@@ -37,28 +33,33 @@ function apiUrl(path: string) {
   return new URL(path, baseUrl).toString();
 }
 
-export async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
+export async function requestApi<T>(
+  path: string,
+  init?: RequestInit,
+  responseSchema?: ZodType<T>,
+): Promise<T> {
   const sessionToken = (await cookies()).get(sessionCookieName)?.value;
-  const response = await fetch(apiUrl(path), {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "content-type": "application/json",
-      ...(sessionToken ? { authorization: `Session ${sessionToken}` } : {}),
-      ...init?.headers,
-    },
-  });
-  if (response.status === 204) return undefined as T;
-  const body = (await response.json()) as { error?: string } & T;
-  if (!response.ok) {
-    throw new ApiError(body.error ?? "The API request failed", response.status);
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), {
+      ...init,
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json",
+        ...(sessionToken ? { authorization: `Session ${sessionToken}` } : {}),
+        ...init?.headers,
+      },
+    });
+  } catch {
+    throw new ApiError("Unable to reach the API", 0, "network_error");
   }
-  return body;
+  return parseApiResponse(response, responseSchema);
 }
 
 export async function getOptionalSession() {
   try {
-    return (await requestApi<{ session: AuthSession }>("/v1/auth/session")).session;
+    return (await requestApi("/v1/auth/session", undefined, authSessionResponseSchema))
+      .session;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;
@@ -72,17 +73,23 @@ export async function requireSession() {
 }
 
 export function getMembers() {
-  return requestApi<{ members: OrganizationMember[] }>("/v1/members");
+  return requestApi("/v1/members", undefined, membersResponseSchema);
 }
 
 export function getOrganizations() {
-  return requestApi<{ organizations: OrganizationAccess[] }>(
+  return requestApi(
     "/v1/auth/organizations",
+    undefined,
+    organizationsResponseSchema,
   );
 }
 
 export function getInvitation(token: string) {
-  return requestApi<{ invitation: Invitation }>(`/v1/invitations/${token}`);
+  return requestApi(
+    `/v1/invitations/${token}`,
+    undefined,
+    invitationResponseSchema,
+  );
 }
 
 export function getIncidents(filters: {

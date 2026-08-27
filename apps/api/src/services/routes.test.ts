@@ -192,11 +192,11 @@ test("service environment routes reject expiry on non-ephemeral environments", a
   assert.equal(createResponse.statusCode, 400);
   assert.equal(updateResponse.statusCode, 400);
   assert.equal(
-    createResponse.json().issues[0].message,
+    createResponse.json().error.issues[0].message,
     "Only ephemeral environments may have an expiry time",
   );
   assert.equal(
-    updateResponse.json().issues[0].message,
+    updateResponse.json().error.issues[0].message,
     "Only ephemeral environments may have an expiry time",
   );
   await app.close();

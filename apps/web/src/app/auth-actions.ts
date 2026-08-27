@@ -1,16 +1,17 @@
 "use server";
 
+import {
+  createdInvitationResponseSchema,
+  memberResponseSchema,
+  sessionResultResponseSchema,
+} from "@incidentflow/contracts";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { sessionCookieName, sessionMaxAgeSeconds } from "@/lib/auth-constants";
 import { ApiError, requestApi } from "@/lib/api";
-import type {
-  CreatedInvitation,
-  OrganizationMember,
-  SessionResult,
-} from "@/lib/types";
+import type { SessionResult } from "@/lib/types";
 
 export type AuthFormState = { error: string | null };
 export type InvitationFormState = {
@@ -44,13 +45,17 @@ export async function loginAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   try {
-    const { session } = await requestApi<{ session: SessionResult }>("/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify({
-        email: value(formData, "email"),
-        password: value(formData, "password"),
-      }),
-    });
+    const { session } = await requestApi(
+      "/v1/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          email: value(formData, "email"),
+          password: value(formData, "password"),
+        }),
+      },
+      sessionResultResponseSchema,
+    );
     await setSessionCookie(session);
   } catch (error) {
     return { error: message(error, "Unable to sign in") };
@@ -68,12 +73,13 @@ export async function logoutAction() {
 }
 
 export async function switchOrganizationAction(formData: FormData) {
-  const { session } = await requestApi<{ session: SessionResult }>(
+  const { session } = await requestApi(
     "/v1/auth/switch-organization",
     {
       method: "POST",
       body: JSON.stringify({ organizationSlug: value(formData, "organizationSlug") }),
     },
+    sessionResultResponseSchema,
   );
   await setSessionCookie(session);
   redirect("/");
@@ -85,7 +91,7 @@ export async function acceptInvitationAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   try {
-    const { session } = await requestApi<{ session: SessionResult }>(
+    const { session } = await requestApi(
       `/v1/invitations/${token}/accept`,
       {
         method: "POST",
@@ -94,6 +100,7 @@ export async function acceptInvitationAction(
           password: value(formData, "password"),
         }),
       },
+      sessionResultResponseSchema,
     );
     await setSessionCookie(session);
   } catch (error) {
@@ -107,7 +114,7 @@ export async function createInvitationAction(
   formData: FormData,
 ): Promise<InvitationFormState> {
   try {
-    const { invitation } = await requestApi<{ invitation: CreatedInvitation }>(
+    const { invitation } = await requestApi(
       "/v1/invitations",
       {
         method: "POST",
@@ -116,6 +123,7 @@ export async function createInvitationAction(
           role: value(formData, "role"),
         }),
       },
+      createdInvitationResponseSchema,
     );
     return { error: null, invitationUrl: `/invite/${invitation.token}` };
   } catch (error) {
@@ -129,13 +137,17 @@ export async function updateMemberAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   try {
-    await requestApi<{ member: OrganizationMember }>(`/v1/members/${userId}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        role: value(formData, "role"),
-        status: value(formData, "status"),
-      }),
-    });
+    await requestApi(
+      `/v1/members/${userId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          role: value(formData, "role"),
+          status: value(formData, "status"),
+        }),
+      },
+      memberResponseSchema,
+    );
     revalidatePath("/settings/members");
   } catch (error) {
     return { error: message(error, "Unable to update the member") };

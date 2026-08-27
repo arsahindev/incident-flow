@@ -188,7 +188,9 @@ test(
       });
 
       assert.equal(response.statusCode, 404);
-      assert.deepEqual(response.json(), { error: "Affected service was not found" });
+      assert.equal(response.json().error.code, "not_found");
+      assert.equal(response.json().error.message, "Affected service was not found");
+      assert.ok(response.json().error.requestId);
       assert.equal(
         await prisma.incident.count({ where: { organizationId: organizationB } }),
         0,

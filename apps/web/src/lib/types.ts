@@ -1,63 +1,25 @@
+import type {
+  AuthContext,
+  CreatedInvitation as SharedCreatedInvitation,
+  Invitation as SharedInvitation,
+  OrganizationAccess as SharedOrganizationAccess,
+  OrganizationMember as SharedOrganizationMember,
+  Permission as SharedPermission,
+  SessionResult as SharedSessionResult,
+  TeamSummary,
+} from "@incidentflow/contracts";
+
 export type IncidentStatus = "open" | "acknowledged" | "resolved";
 export type IncidentPriority = "low" | "medium" | "high" | "critical";
 
-export type Team = { id: string; name: string; slug: string };
-
-export type Permission =
-  | "incidents.read"
-  | "incidents.manage"
-  | "services.read"
-  | "services.manage"
-  | "teams.read"
-  | "members.read"
-  | "members.manage";
-
-export type AuthSession = {
-  sessionId: string;
-  userId: string;
-  email: string;
-  displayName: string;
-  organizationId: string;
-  organizationSlug: string;
-  organizationName: string;
-  role: "owner" | "admin" | "responder" | "viewer";
-  permissions: Permission[];
-};
-
-export type OrganizationAccess = {
-  id: string;
-  name: string;
-  slug: string;
-  role: AuthSession["role"];
-};
-
-export type SessionResult = {
-  token: string;
-  expiresAt: string;
-  context: AuthSession;
-};
-
-export type OrganizationMember = {
-  userId: string;
-  email: string;
-  displayName: string;
-  userStatus: "active" | "disabled";
-  role: AuthSession["role"];
-  membershipStatus: "active" | "suspended";
-  teams: Team[];
-  createdAt: string;
-};
-
-export type Invitation = {
-  id: string;
-  email: string;
-  role: AuthSession["role"];
-  organizationName: string;
-  organizationSlug: string;
-  expiresAt: string;
-};
-
-export type CreatedInvitation = Invitation & { token: string };
+export type Team = TeamSummary;
+export type Permission = SharedPermission;
+export type AuthSession = AuthContext;
+export type OrganizationAccess = SharedOrganizationAccess;
+export type SessionResult = SharedSessionResult;
+export type OrganizationMember = SharedOrganizationMember;
+export type Invitation = SharedInvitation;
+export type CreatedInvitation = SharedCreatedInvitation;
 
 export type ServiceEnvironment = {
   id: string;

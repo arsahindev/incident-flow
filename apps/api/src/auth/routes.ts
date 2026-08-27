@@ -1,6 +1,6 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
-import type { ZodError } from "zod";
+import type { FastifyInstance } from "fastify";
 
+import { sendValidationError } from "../http/responses.js";
 import { requirePermission } from "./permissions.js";
 import { extractSessionToken } from "./request.js";
 import {
@@ -14,16 +14,6 @@ import {
   updateMemberSchema,
 } from "./schemas.js";
 import type { AuthService } from "./service.js";
-
-function sendValidationError(reply: FastifyReply, error: ZodError) {
-  return reply.code(400).send({
-    error: "Validation failed",
-    issues: error.issues.map((issue) => ({
-      path: issue.path.join("."),
-      message: issue.message,
-    })),
-  });
-}
 
 export async function registerAuthRoutes(
   app: FastifyInstance,

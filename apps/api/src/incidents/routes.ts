@@ -1,7 +1,7 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
-import type { ZodError } from "zod";
+import type { FastifyInstance } from "fastify";
 
 import { requirePermission } from "../auth/permissions.js";
+import { sendValidationError } from "../http/responses.js";
 import type { IncidentRepository } from "./repository.js";
 import {
   createIncidentSchema,
@@ -13,16 +13,6 @@ import {
 type IncidentRouteOptions = {
   repository: IncidentRepository;
 };
-
-function sendValidationError(reply: FastifyReply, error: ZodError) {
-  return reply.code(400).send({
-    error: "Validation failed",
-    issues: error.issues.map((issue) => ({
-      path: issue.path.join("."),
-      message: issue.message,
-    })),
-  });
-}
 
 export async function registerIncidentRoutes(
   app: FastifyInstance,

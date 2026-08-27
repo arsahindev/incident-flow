@@ -10,6 +10,7 @@ import { extractSessionToken } from "./auth/request.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import type { AuthService } from "./auth/service.js";
 import type { AuthContext } from "./auth/types.js";
+import { sendApiError } from "./http/responses.js";
 import {
   ResourceConflictError,
   ResourceNotFoundError,
@@ -44,6 +45,7 @@ export function buildApp(options: BuildAppOptions = {}) {
   });
 
   app.addHook("onSend", async (request, reply, payload) => {
+    reply.header("x-request-id", String(request.id));
     if (request.url.split("?", 1)[0]!.startsWith("/v1/")) {
       reply.header("cache-control", "no-store");
     }
@@ -89,31 +91,37 @@ export function buildApp(options: BuildAppOptions = {}) {
     });
   }
 
+  app.setNotFoundHandler((request, reply) =>
+    sendApiError(reply, 404, "not_found", `${request.method} ${request.url} was not found`),
+  );
+
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AuthenticationError) {
-      return reply.code(401).send({ error: error.message });
+      return sendApiError(reply, 401, "authentication_required", error.message);
     }
 
     if (error instanceof AuthorizationError) {
-      return reply.code(403).send({ error: error.message });
+      return sendApiError(reply, 403, "permission_denied", error.message);
     }
 
     if (error instanceof LoginRateLimitError) {
-      return reply
-        .code(429)
-        .header("retry-after", String(error.retryAfterSeconds))
-        .send({ error: error.message });
+      reply.header("retry-after", String(error.retryAfterSeconds));
+      return sendApiError(reply, 429, "rate_limited", error.message);
     }
     if (error instanceof ResourceNotFoundError) {
-      return reply.code(404).send({ error: error.message });
+      return sendApiError(reply, 404, "not_found", error.message);
     }
 
     if (error instanceof ResourceConflictError) {
-      return reply.code(409).send({ error: error.message });
+      return sendApiError(reply, 409, "conflict", error.message);
+    }
+
+    if ((error as { statusCode?: number }).statusCode === 400) {
+      return sendApiError(reply, 400, "invalid_request", "Request body is invalid");
     }
 
     app.log.error(error);
-    return reply.code(500).send({ error: "Internal server error" });
+    return sendApiError(reply, 500, "internal_error", "Internal server error");
   });
 
   return app;
