@@ -1,0 +1,41 @@
+{
+  "folders": [
+    {
+      "name": "Contracts",
+      "path": "./packages/contracts"
+    }
+  ],
+  "settings": {
+    "git.openRepositoryInParentFolders": "always",
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/*.js.map": true,
+      "**/*.d.ts.map": true
+    },
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/dist/**": true
+    },
+    "search.useIgnoreFiles": true
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Contracts: debug tests",
+        "type": "node",
+        "request": "launch",
+        "runtimeArgs": ["--enable-source-maps", "--import", "tsx", "--test"],
+        "program": "${workspaceFolder}/src/contracts.test.ts",
+        "cwd": "${workspaceFolder}",
+        "console": "integratedTerminal",
+        "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+      }
+    ]
+  }
+}
