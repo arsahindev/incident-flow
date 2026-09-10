@@ -4,6 +4,10 @@ export const organizationRoles = ["owner", "admin", "responder", "viewer"] as co
 export const organizationRoleSchema = z.enum(organizationRoles);
 export type OrganizationRole = z.infer<typeof organizationRoleSchema>;
 
+export const userStatuses = ["active", "disabled"] as const;
+export const userStatusSchema = z.enum(userStatuses);
+export type UserStatus = z.infer<typeof userStatusSchema>;
+
 export const membershipStatuses = ["active", "suspended"] as const;
 export const membershipStatusSchema = z.enum(membershipStatuses);
 export type MembershipStatus = z.infer<typeof membershipStatusSchema>;
@@ -65,7 +69,7 @@ export const organizationMemberSchema = z.object({
   userId: z.uuid(),
   email: z.email(),
   displayName: z.string().min(1),
-  userStatus: z.enum(["active", "disabled"]),
+  userStatus: userStatusSchema,
   role: organizationRoleSchema,
   membershipStatus: membershipStatusSchema,
   teams: z.array(teamSummarySchema),
