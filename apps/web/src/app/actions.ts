@@ -1,5 +1,6 @@
 "use server";
 
+import { incidentResponseSchema } from "@incidentflow/contracts";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -32,17 +33,21 @@ export async function createIncidentAction(
 ): Promise<IncidentFormState> {
   let incidentId: string;
   try {
-    const response = await requestApi<{ incident: IncidentDetail }>("/v1/incidents", {
-      method: "POST",
-      body: JSON.stringify({
-        title: formValue(formData, "title"),
-        description: formValue(formData, "description"),
-        priority: formValue(formData, "priority"),
-        teamId: formValue(formData, "teamId") || null,
-        serviceIds: formValues(formData, "serviceIds"),
-        primaryServiceId: formValue(formData, "primaryServiceId") || null,
-      }),
-    });
+    const response = await requestApi<{ incident: IncidentDetail }>(
+      "/v1/incidents",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          title: formValue(formData, "title"),
+          description: formValue(formData, "description"),
+          priority: formValue(formData, "priority"),
+          teamId: formValue(formData, "teamId") || null,
+          serviceIds: formValues(formData, "serviceIds"),
+          primaryServiceId: formValue(formData, "primaryServiceId") || null,
+        }),
+      },
+      incidentResponseSchema,
+    );
     incidentId = response.incident.id;
   } catch (error) {
     return errorState(error);
@@ -58,15 +63,19 @@ export async function updateIncidentAction(
   formData: FormData,
 ): Promise<IncidentFormState> {
   try {
-    await requestApi(`/v1/incidents/${incidentId}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        status: formValue(formData, "status"),
-        teamId: formValue(formData, "teamId") || null,
-        serviceIds: formValues(formData, "serviceIds"),
-        primaryServiceId: formValue(formData, "primaryServiceId") || null,
-      }),
-    });
+    await requestApi(
+      `/v1/incidents/${incidentId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: formValue(formData, "status"),
+          teamId: formValue(formData, "teamId") || null,
+          serviceIds: formValues(formData, "serviceIds"),
+          primaryServiceId: formValue(formData, "primaryServiceId") || null,
+        }),
+      },
+      incidentResponseSchema,
+    );
   } catch (error) {
     return errorState(error);
   }
