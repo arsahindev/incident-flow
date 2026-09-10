@@ -31,10 +31,15 @@
         "type": "node",
         "request": "launch",
         "runtimeExecutable": "node",
-        "runtimeArgs": ["--enable-source-maps", "--import", "tsx"],
-        "program": "${workspaceFolder}/src/server.ts",
+        "runtimeArgs": ["--enable-source-maps"],
+        "program": "${workspaceFolder}/dist/server.js",
         "cwd": "${workspaceFolder}",
         "console": "integratedTerminal",
+        "preLaunchTask": "API: build for debugging",
+        "sourceMaps": true,
+        "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+        "resolveSourceMapLocations": ["${workspaceFolder}/dist/**/*.js"],
+        "smartStep": true,
         "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
       },
       {
@@ -46,6 +51,22 @@
         "cwd": "${workspaceFolder}",
         "console": "integratedTerminal",
         "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "API: build for debugging",
+        "type": "process",
+        "command": "pnpm",
+        "args": ["build"],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": ["$tsc"],
+        "group": "build"
       }
     ]
   }
