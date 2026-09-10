@@ -9,10 +9,21 @@ const { DATABASE_URL: databaseUrl, PASSWORD_PEPPER: passwordPepper } =
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
+function optionalEnvironmentValue(name: string) {
+  const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : undefined;
+}
+
+const seedEmail = optionalEnvironmentValue("SEED_OWNER_EMAIL");
+const seedPassword = optionalEnvironmentValue("SEED_OWNER_PASSWORD");
+if ((seedEmail === undefined) !== (seedPassword === undefined)) {
+  throw new Error("SEED_OWNER_EMAIL and SEED_OWNER_PASSWORD must be configured together");
+}
+
 const developmentOrganization = {
   id: "11111111-1111-4111-8111-111111111111",
-  name: "IncidentFlow Development",
-  slug: "incidentflow-dev",
+  name: optionalEnvironmentValue("SEED_ORGANIZATION_NAME") ?? "IncidentFlow Development",
+  slug: optionalEnvironmentValue("SEED_ORGANIZATION_SLUG") ?? "incidentflow-dev",
 };
 
 const platformTeam = {
@@ -23,9 +34,9 @@ const platformTeam = {
 
 const developmentOwner = {
   id: "88888888-8888-4888-8888-888888888888",
-  email: "admin@incidentflow.local",
+  email: seedEmail ?? "admin@incidentflow.local",
   displayName: "IncidentFlow Admin",
-  password: "IncidentFlow-Dev-2026!",
+  password: seedPassword ?? "IncidentFlow-Dev-2026!",
 };
 
 const services = [

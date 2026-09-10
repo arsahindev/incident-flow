@@ -1,9 +1,11 @@
 # Phase 3 shareable-demo deployment
 
-This runbook deploys the current Phase 3 application as a small, single-host
-HTTPS demo. It is deliberately not a claim of the later Phase 10 production
-platform: there are no application Docker images, infrastructure-as-code,
-automated deployment, shared realtime fan-out, backups, or alerting yet.
+This runbook deploys the current Phase 3 application as a small, single-origin
+HTTPS demo. The repository provides a CloudFormation/App Runner path for
+isolated `dev` and `prod` environments, plus the manual-host topology for
+understanding the architecture. It is deliberately not a claim of the later
+Phase 10 production platform: shared realtime fan-out, deployment automation,
+monitoring/alerts, and restore exercises remain future work.
 
 ## Why one public origin is required
 
@@ -18,7 +20,49 @@ phase. The API would not receive the host-only session cookie and realtime
 authentication would fail. A reverse proxy lets the API remain private while
 the browser reaches its socket endpoint at the dashboard origin.
 
-## What to provision
+## AWS App Runner deployment
+
+The versioned AWS demo path is intentionally small and costs money while it is
+running. For each environment it creates:
+
+- one private ECR repository shared by the environments;
+- one immutable, Linux/amd64 image tag for the checked-out Git revision;
+- an App Runner service running Nginx, Next.js, and Fastify in one container;
+- a private, single-AZ PostgreSQL RDS instance with seven-day backups;
+- Secrets Manager values for the database password, password pepper, and a
+  generated demo-owner password; and
+- least-privilege App Runner roles, a VPC connector, and security groups that
+  permit database access only from the service.
+
+The container exposes the dashboard at its App Runner HTTPS URL and the API at
+the same host's `/health` and `/ready` paths. Keeping Socket.IO at
+`/socket.io/` on that host is required for the existing session cookie.
+
+Prerequisites: Docker Desktop, AWS CLI authentication for the intended AWS
+account, and permission to create CloudFormation, ECR, App Runner, RDS, VPC,
+IAM, and Secrets Manager resources. The deployment script defaults to
+`eu-central-1` and discovers that region's default VPC and subnets.
+
+```bash
+# From the intended committed revision; deploy each isolated environment.
+infra/scripts/deploy-app-runner-environment.sh dev
+infra/scripts/deploy-app-runner-environment.sh prod
+```
+
+The script validates/builds and locally loads the image for Linux/amd64, deploys the ECR stack,
+pushes the immutable environment/revision tag, and applies the environment
+stack twice. The first application creates the generated App Runner hostname;
+the second makes it Fastify's exact `WEB_ORIGIN`. It prints the web URL, API
+liveness/readiness URLs, and the Secret Manager ARN containing the generated
+demo password. Retrieve the password only through the AWS console or CLI with
+appropriate permission; do not put it in source control or logs.
+
+CloudFormation retains an RDS snapshot if an environment stack is deleted. To
+stop costs, explicitly delete both environment stacks when the demo is no
+longer needed, then decide whether to retain or delete their snapshots and
+secrets. The image repository intentionally retains recent images for rollback.
+
+## Manual-host deployment
 
 - A Linux VM or hosting environment that can run two persistent Node.js 22+
   processes and a reverse proxy.

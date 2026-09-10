@@ -67,3 +67,13 @@ test("web origins allow loopback HTTP and normalize a trailing slash", () => {
 
   assert.equal(environment.NEXT_PUBLIC_REALTIME_URL, "http://localhost:4000");
 });
+
+test("web client configuration permits an explicit same-origin realtime endpoint", () => {
+  const environment = parseConfiguration(
+    "incidentflow-web",
+    webClientEnvironmentSchema("production"),
+    { NEXT_PUBLIC_REALTIME_URL: "same-origin" },
+  );
+
+  assert.equal(environment.NEXT_PUBLIC_REALTIME_URL, "same-origin");
+});

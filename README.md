@@ -82,11 +82,15 @@ Realtime messages intentionally contain only an incident ID, event type, schema 
 ## Sharing a Phase 3 demo
 
 The current milestone can be shared from one HTTPS origin with a private API
-process, PostgreSQL, and a WebSocket-capable reverse proxy. See the
+process, PostgreSQL, and a WebSocket-capable reverse proxy. A versioned
+CloudFormation/App Runner demo path creates separate `dev` and `prod`
+environments with an isolated RDS database and Secrets Manager values; the
+same origin carries the dashboard, API health endpoints, and Socket.IO
+handshake. See the
 [Phase 3 demo deployment runbook](docs/phase-3-demo-deployment.md) for the
-required topology, secrets, migration command, start commands, proxy example,
-and known Phase 3 limits. It intentionally does not represent the later Phase
-10 production-platform scope.
+required topology, AWS prerequisites/cost lifecycle, secrets, migration
+command, start commands, proxy example, and known Phase 3 limits. It
+intentionally does not represent the later Phase 10 production-platform scope.
 
 ## Quality checks
 

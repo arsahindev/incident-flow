@@ -38,7 +38,11 @@ export function RealtimeIncidentRefresh({
       }, 75);
     };
 
-    const socket = io(clientEnvironment.NEXT_PUBLIC_REALTIME_URL, {
+    const realtimeUrl =
+      clientEnvironment.NEXT_PUBLIC_REALTIME_URL === "same-origin"
+        ? window.location.origin
+        : clientEnvironment.NEXT_PUBLIC_REALTIME_URL;
+    const socket = io(realtimeUrl, {
       withCredentials: true,
       transports: ["websocket", "polling"],
     });
