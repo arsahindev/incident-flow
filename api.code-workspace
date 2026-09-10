@@ -1,0 +1,73 @@
+{
+  "folders": [
+    {
+      "name": "API",
+      "path": "./apps/api"
+    }
+  ],
+  "settings": {
+    "git.openRepositoryInParentFolders": "always",
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/*.js.map": true,
+      "**/*.d.ts.map": true
+    },
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/dist/**": true
+    },
+    "search.useIgnoreFiles": true
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "API: debug server",
+        "type": "node",
+        "request": "launch",
+        "runtimeExecutable": "node",
+        "runtimeArgs": ["--enable-source-maps"],
+        "program": "${workspaceFolder}/dist/server.js",
+        "cwd": "${workspaceFolder}",
+        "console": "integratedTerminal",
+        "preLaunchTask": "API: build for debugging",
+        "sourceMaps": true,
+        "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+        "resolveSourceMapLocations": ["${workspaceFolder}/dist/**/*.js"],
+        "smartStep": true,
+        "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+      },
+      {
+        "name": "API: debug current test file",
+        "type": "node",
+        "request": "launch",
+        "runtimeArgs": ["--enable-source-maps", "--import", "tsx", "--test"],
+        "program": "${file}",
+        "cwd": "${workspaceFolder}",
+        "console": "integratedTerminal",
+        "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "API: build for debugging",
+        "type": "process",
+        "command": "pnpm",
+        "args": ["build"],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": ["$tsc"],
+        "group": "build"
+      }
+    ]
+  }
+}

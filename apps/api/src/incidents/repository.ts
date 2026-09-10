@@ -5,6 +5,7 @@ import type {
   IncidentStatus,
   IncidentListFilters,
   IncidentListResult,
+  IncidentMutationResult,
   TeamRecord,
   UpdateIncidentInput,
 } from "./types.js";
@@ -37,13 +38,13 @@ export interface IncidentRepository {
     organizationSlug: string,
     input: CreateIncidentInput,
     actorUserId: string,
-  ): Promise<IncidentDetailRecord>;
+  ): Promise<IncidentMutationResult>;
   updateIncident(
     organizationSlug: string,
     incidentId: string,
     input: UpdateIncidentInput,
     actorUserId: string,
-  ): Promise<IncidentDetailRecord>;
+  ): Promise<IncidentMutationResult>;
 }
 
 export const statusLabels: Record<IncidentStatus, string> = {

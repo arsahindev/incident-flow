@@ -6,6 +6,7 @@ import { ApiError, getIncident, getServices, getTeams, requireSession } from "@/
 
 import { PriorityBadge, StatusBadge } from "../../ui/badges";
 import { IncidentControls } from "../../ui/incident-controls";
+import { RealtimeIncidentRefresh } from "../../ui/realtime-incident-refresh";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", {
@@ -54,7 +55,15 @@ export default async function IncidentPage({
             <StatusBadge status={incident.status} />
           </div>
         </div>
-        <p className="text-sm text-slate-500">Created {formatDate(incident.createdAt)}</p>
+        <div className="text-right">
+          <p className="text-sm text-slate-500">Created {formatDate(incident.createdAt)}</p>
+          <div className="mt-2">
+            <RealtimeIncidentRefresh
+              incidentId={incident.id}
+              incidents={[{ id: incident.id, version: incident.version }]}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="mt-10 grid items-start gap-8 lg:grid-cols-[1fr_22rem]">

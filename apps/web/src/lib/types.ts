@@ -1,6 +1,13 @@
 import type {
   AuthContext,
+  AffectedService as SharedAffectedService,
   CreatedInvitation as SharedCreatedInvitation,
+  IncidentActivity as SharedIncidentActivity,
+  IncidentDetail as SharedIncidentDetail,
+  IncidentPagination as SharedIncidentPagination,
+  IncidentPriority as SharedIncidentPriority,
+  IncidentStatus as SharedIncidentStatus,
+  IncidentSummary as SharedIncidentSummary,
   Invitation as SharedInvitation,
   OrganizationAccess as SharedOrganizationAccess,
   OrganizationMember as SharedOrganizationMember,
@@ -9,8 +16,8 @@ import type {
   TeamSummary,
 } from "@incidentflow/contracts";
 
-export type IncidentStatus = "open" | "acknowledged" | "resolved";
-export type IncidentPriority = "low" | "medium" | "high" | "critical";
+export type IncidentStatus = SharedIncidentStatus;
+export type IncidentPriority = SharedIncidentPriority;
 
 export type Team = TeamSummary;
 export type Permission = SharedPermission;
@@ -60,45 +67,8 @@ export type ServiceDetail = Service & {
   }>;
 };
 
-export type AffectedService = Pick<
-  Service,
-  "id" | "name" | "slug" | "type" | "tier" | "status"
-> & { isPrimary: boolean };
-
-export type IncidentSummary = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: IncidentStatus;
-  priority: IncidentPriority;
-  team: Team | null;
-  affectedServices: AffectedService[];
-  resolvedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type IncidentActivity = {
-  id: string;
-  type:
-    | "created"
-    | "status_changed"
-    | "team_assigned"
-    | "affected_services_changed";
-  message: string;
-  fromValue: string | null;
-  toValue: string | null;
-  actor: { id: string; displayName: string } | null;
-  createdAt: string;
-};
-
-export type IncidentDetail = IncidentSummary & {
-  activity: IncidentActivity[];
-};
-
-export type IncidentPagination = {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-};
+export type AffectedService = SharedAffectedService;
+export type IncidentSummary = SharedIncidentSummary;
+export type IncidentActivity = SharedIncidentActivity;
+export type IncidentDetail = SharedIncidentDetail;
+export type IncidentPagination = SharedIncidentPagination;

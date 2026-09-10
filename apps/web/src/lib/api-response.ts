@@ -1,8 +1,9 @@
+import type { ZodType } from "zod";
+
 import {
   apiErrorResponseSchema,
   type ApiErrorIssue,
 } from "@incidentflow/contracts";
-import type { ZodType } from "zod";
 
 export type ClientApiErrorCode =
   | "network_error"

@@ -6,6 +6,7 @@ import type { IncidentPriority, IncidentStatus } from "@/lib/types";
 
 import { PriorityBadge, StatusBadge } from "./ui/badges";
 import { CreateIncidentForm } from "./ui/create-incident-form";
+import { RealtimeIncidentRefresh } from "./ui/realtime-incident-refresh";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", {
@@ -64,6 +65,14 @@ export default async function Home({
         <p className="mt-2 max-w-2xl text-slate-400">
           Create incidents, coordinate ownership, and follow every lifecycle change.
         </p>
+        <div className="mt-3">
+          <RealtimeIncidentRefresh
+            incidents={incidents.map((incident) => ({
+              id: incident.id,
+              version: incident.version,
+            }))}
+          />
+        </div>
       </div>
 
       <section className="mt-10 grid gap-4 md:grid-cols-3" aria-label="Incident summary">

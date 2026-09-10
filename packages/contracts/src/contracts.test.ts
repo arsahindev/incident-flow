@@ -4,6 +4,10 @@ import { test } from "node:test";
 import {
   apiErrorResponseSchema,
   authSessionResponseSchema,
+  incidentResponseSchema,
+  incidentsResponseSchema,
+  realtimeIncidentSignalSchema,
+  realtimeJoinIncidentRequestSchema,
   sessionResultResponseSchema,
 } from "./index.js";
 
@@ -47,6 +51,59 @@ test("error contracts require a stable code and request correlation id", () => {
   );
   assert.equal(
     apiErrorResponseSchema.safeParse({ error: { message: "Validation failed" } }).success,
+    false,
+  );
+});
+
+test("incident contracts carry a positive canonical version", () => {
+  const incident = {
+    id: "33333333-3333-4333-8333-333333333333",
+    title: "Checkout API unavailable",
+    description: null,
+    status: "open",
+    priority: "high",
+    team: null,
+    affectedServices: [],
+    version: 2,
+    resolvedAt: null,
+    createdAt: "2026-08-27T12:00:00.000Z",
+    updatedAt: "2026-08-27T12:01:00.000Z",
+  };
+
+  assert.equal(
+    incidentsResponseSchema.parse({
+      incidents: [incident],
+      pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 },
+    }).incidents[0]?.version,
+    2,
+  );
+  assert.equal(
+    incidentResponseSchema.parse({ incident: { ...incident, activity: [] } }).incident
+      .version,
+    2,
+  );
+  assert.equal(
+    incidentResponseSchema.safeParse({
+      incident: { ...incident, version: 0, activity: [] },
+    }).success,
+    false,
+  );
+});
+
+test("realtime contracts stay versioned and strict at room boundaries", () => {
+  const signal = realtimeIncidentSignalSchema.parse({
+    schemaVersion: 1,
+    type: "incident.status_changed",
+    incidentId: "33333333-3333-4333-8333-333333333333",
+    incidentVersion: 3,
+    occurredAt: "2026-08-27T12:02:00.000Z",
+  });
+  assert.equal(signal.incidentVersion, 3);
+  assert.equal(
+    realtimeJoinIncidentRequestSchema.safeParse({
+      incidentId: signal.incidentId,
+      organizationId: "11111111-1111-4111-8111-111111111111",
+    }).success,
     false,
   );
 });

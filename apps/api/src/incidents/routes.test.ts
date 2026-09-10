@@ -37,6 +37,7 @@ function incidentFixture(): IncidentDetailRecord {
         isPrimary: true,
       },
     ],
+    version: 1,
     resolvedAt: null,
     createdAt: "2026-08-08T12:00:00.000Z",
     updatedAt: "2026-08-08T12:00:00.000Z",
@@ -69,10 +70,24 @@ function createRepository(overrides: Partial<IncidentRepository> = {}) {
       return incidentFixture();
     },
     async createIncident(_organizationSlug, input) {
-      return { ...incidentFixture(), ...input, description: input.description ?? null };
+      return {
+        incident: {
+          ...incidentFixture(),
+          title: input.title,
+          description: input.description ?? null,
+          priority: input.priority,
+        },
+        changes: ["created", "affected_services", "activity"],
+      };
     },
     async updateIncident(_organizationSlug, _incidentId, input) {
-      return { ...incidentFixture(), ...input };
+      return {
+        incident: {
+          ...incidentFixture(),
+          status: input.status ?? incidentFixture().status,
+        },
+        changes: input.status ? ["status", "activity"] : [],
+      };
     },
     ...overrides,
   };
@@ -143,7 +158,10 @@ test("POST /v1/incidents validates and normalizes its input", async () => {
   const repository = createRepository({
     async createIncident(_organizationSlug, input) {
       receivedInput = input;
-      return incidentFixture();
+      return {
+        incident: incidentFixture(),
+        changes: ["created", "affected_services", "activity"],
+      };
     },
   });
   const app = buildApp({
@@ -184,7 +202,10 @@ test("PATCH /v1/incidents/:id accepts lifecycle changes and maps missing records
   const repository = createRepository({
     async updateIncident(_organizationSlug, _incidentId, input) {
       receivedInput = input;
-      return { ...incidentFixture(), status: input.status ?? "open" };
+      return {
+        incident: { ...incidentFixture(), status: input.status ?? "open", version: 2 },
+        changes: ["status", "activity"],
+      };
     },
   });
   const app = buildApp({

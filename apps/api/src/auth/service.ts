@@ -1,4 +1,3 @@
-import { hash, verify } from "@node-rs/argon2";
 import { createHash, randomBytes } from "node:crypto";
 
 import type {
@@ -9,6 +8,7 @@ import type {
 } from "../generated/prisma/client.js";
 import { ResourceConflictError, ResourceNotFoundError } from "../incidents/repository.js";
 import { AuthenticationError, LoginRateLimitError } from "./errors.js";
+import { hashPassword, verifyPasswordHash } from "./passwords.js";
 import { permissionsForRole } from "./permissions.js";
 import type {
   AuthContext,
@@ -26,7 +26,6 @@ const invitationLifetimeMs = 48 * 60 * 60 * 1_000;
 const throttleWindowMs = 15 * 60 * 1_000;
 const throttleLockMs = 15 * 60 * 1_000;
 const maxLoginAttempts = 5;
-const passwordOptions = { memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const;
 const dummyPasswordHash =
   "$argon2id$v=19$m=19456,t=2,p=1$tYnlbxVo24Ohopnd8MKzSw$ly22QRd3EUk/V0jPrhEZ5103eveL7jRPY2xTg6d5MDo";
 
@@ -54,12 +53,13 @@ function createOpaqueToken() {
   return randomBytes(32).toString("base64url");
 }
 
-function toContext(session: {
-  id: string;
+type SessionContextData = {
   user: { id: string; email: string; displayName: string };
   organization: { id: string; slug: string; name: string };
   membership: { role: PrismaOrganizationRole };
-}): AuthContext {
+};
+
+function toContext(session: { id: string } & SessionContextData): AuthContext {
   const role = lower<OrganizationRole>(session.membership.role);
   return {
     sessionId: session.id,
@@ -111,11 +111,15 @@ export interface AuthService {
 }
 
 export class PrismaAuthService implements AuthService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly passwordPepper: Uint8Array,
+  ) {}
 
   async authenticateToken(token: string) {
     if (!token) throw new AuthenticationError();
     const now = new Date();
+
     const session = await this.prisma.session.findUnique({
       where: { tokenHash: digest(token) },
       include: sessionInclude,
@@ -159,20 +163,43 @@ export class PrismaAuthService implements AuthService {
         },
       },
     });
-    const passwordMatches = await verify(user?.passwordHash ?? dummyPasswordHash, input.password);
+    // do this calculation regardless of whether the user exists or not to avoid timing attacks
+    const { matches, needsRehash } = await verifyPasswordHash(
+      user?.passwordHash ?? dummyPasswordHash,
+      input.password,
+      this.passwordPepper,
+    );
+
+    if (!user || user.status !== "ACTIVE") {
+      await this.recordLoginFailure(throttleKey);
+      throw new AuthenticationError("Invalid email or password");
+    }
+
+    if (matches && needsRehash) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: await hashPassword(input.password, this.passwordPepper),
+        },
+      });
+    }
+
     const membership = input.organizationSlug
       ? user?.organizationMemberships.find(
           (candidate) => candidate.organization.slug === input.organizationSlug,
         )
       : user?.organizationMemberships[0];
-
-    if (!user || !passwordMatches || user.status !== "ACTIVE" || !membership) {
+    if (!matches || !membership) {
       await this.recordLoginFailure(throttleKey);
       throw new AuthenticationError("Invalid email or password");
     }
 
     await this.prisma.loginThrottle.deleteMany({ where: { keyHash: throttleKey } });
-    return this.createSession(user.id, membership.organizationId);
+    return this.createSession({
+      user,
+      organization: membership.organization,
+      membership,
+    });
   }
 
   async logout(token: string) {
@@ -191,7 +218,10 @@ export class PrismaAuthService implements AuthService {
         status: "ACTIVE",
         organization: { slug: organizationSlug },
       },
-      select: { organizationId: true },
+      select: {
+        role: true,
+        organization: { select: { id: true, slug: true, name: true } },
+      },
     });
     if (!membership) throw new ResourceNotFoundError("Organization membership");
 
@@ -199,7 +229,15 @@ export class PrismaAuthService implements AuthService {
       where: { id: context.sessionId },
       data: { revokedAt: new Date() },
     });
-    return this.createSession(context.userId, membership.organizationId);
+    return this.createSession({
+      user: {
+        id: context.userId,
+        email: context.email,
+        displayName: context.displayName,
+      },
+      organization: membership.organization,
+      membership,
+    });
   }
 
   async listOrganizations(context: AuthContext) {
@@ -317,19 +355,26 @@ export class PrismaAuthService implements AuthService {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: invitation.email },
     });
+    let existingPasswordNeedsRehash = false;
     if (existingUser) {
-      const passwordMatches = await verify(existingUser.passwordHash, input.password);
-      if (!passwordMatches || existingUser.status !== "ACTIVE") {
+      const passwordVerification = await verifyPasswordHash(
+        existingUser.passwordHash,
+        input.password,
+        this.passwordPepper,
+      );
+      if (!passwordVerification.matches || existingUser.status !== "ACTIVE") {
         throw new AuthenticationError("Existing account credentials are invalid");
       }
+      existingPasswordNeedsRehash = passwordVerification.needsRehash;
     }
-    const passwordHash = existingUser
-      ? existingUser.passwordHash
-      : await hash(input.password, passwordOptions);
+    const passwordHash =
+      existingUser && !existingPasswordNeedsRehash
+        ? existingUser.passwordHash
+        : await hashPassword(input.password, this.passwordPepper);
     const sessionToken = createOpaqueToken();
     const sessionExpiresAt = new Date(Date.now() + sessionLifetimeMs);
 
-    await this.prisma.$transaction(async (transaction) => {
+    const acceptance = await this.prisma.$transaction(async (transaction) => {
       const accepted = await transaction.invitation.updateMany({
         where: {
           id: invitation.id,
@@ -342,7 +387,12 @@ export class PrismaAuthService implements AuthService {
       if (accepted.count !== 1) throw new ResourceNotFoundError("Invitation");
 
       const user = existingUser
-        ? existingUser
+        ? existingPasswordNeedsRehash
+          ? await transaction.user.update({
+              where: { id: existingUser.id },
+              data: { passwordHash },
+            })
+          : existingUser
         : await transaction.user.create({
             data: {
               email: invitation.email,
@@ -357,7 +407,7 @@ export class PrismaAuthService implements AuthService {
           role: invitation.role,
         },
       });
-      await transaction.session.create({
+      const createdSession = await transaction.session.create({
         data: {
           tokenHash: digest(sessionToken),
           userId: user.id,
@@ -375,14 +425,18 @@ export class PrismaAuthService implements AuthService {
           metadata: { invitationId: invitation.id },
         },
       });
+      return { session: createdSession, user };
     });
-
-    const context = await this.authenticateToken(sessionToken);
 
     return {
       token: sessionToken,
       expiresAt: sessionExpiresAt.toISOString(),
-      context,
+      context: toContext({
+        id: acceptance.session.id,
+        user: acceptance.user,
+        organization: invitation.organization,
+        membership: invitation,
+      }),
     };
   }
 
@@ -506,28 +560,30 @@ export class PrismaAuthService implements AuthService {
     });
   }
 
-  private async createSession(userId: string, organizationId: string) {
+  private async createSession(contextData: SessionContextData) {
     const token = createOpaqueToken();
     const expiresAt = new Date(Date.now() + sessionLifetimeMs);
-    await this.prisma.session.create({
+    const session = await this.prisma.session.create({
       data: {
         tokenHash: digest(token),
-        userId,
-        organizationId,
+        userId: contextData.user.id,
+        organizationId: contextData.organization.id,
         expiresAt,
       },
     });
-    const context = await this.authenticateToken(token);
+
     return {
       token,
       expiresAt: expiresAt.toISOString(),
-      context,
+      context: toContext({ id: session.id, ...contextData }),
     };
   }
 
   private async assertLoginAllowed(keyHash: string) {
     const throttle = await this.prisma.loginThrottle.findUnique({ where: { keyHash } });
-    if (throttle?.lockedUntil && throttle.lockedUntil > new Date()) {
+
+    const now = new Date();
+    if (throttle?.lockedUntil && now < throttle.lockedUntil) {
       throw new LoginRateLimitError(
         Math.max(1, Math.ceil((throttle.lockedUntil.getTime() - Date.now()) / 1_000)),
       );
@@ -616,8 +672,4 @@ export class PrismaAuthService implements AuthService {
       },
     });
   }
-}
-
-export async function hashPassword(password: string) {
-  return hash(password, passwordOptions);
 }

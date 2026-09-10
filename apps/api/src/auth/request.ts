@@ -12,7 +12,9 @@ declare module "fastify" {
 export function extractSessionToken(request: FastifyRequest) {
   const authorization = request.headers.authorization;
   if (!authorization) throw new AuthenticationError();
+
   const [scheme, token, extra] = authorization.split(" ");
   if (scheme !== "Session" || !token || extra) throw new AuthenticationError();
+
   return token;
 }

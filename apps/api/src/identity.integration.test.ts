@@ -2,16 +2,21 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { test } from "node:test";
 
+import { hash } from "@node-rs/argon2";
+
 import { buildApp } from "./app.js";
-import { PrismaAuthService, hashPassword } from "./auth/service.js";
+import { PrismaAuthService } from "./auth/service.js";
+import { loadDatabaseConfig } from "./config.js";
 import { createPrismaClient } from "./database.js";
 import { PrismaIncidentRepository } from "./incidents/prisma-repository.js";
 import { PrismaServiceRepository } from "./services/prisma-repository.js";
 
 const runDatabaseTests = process.env.RUN_DATABASE_TESTS === "true";
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  "postgresql://incidentflow:incidentflow_dev@localhost:5432/incidentflow";
+const passwordPepper = Buffer.alloc(32, 3);
+
+function databaseUrl() {
+  return loadDatabaseConfig().DATABASE_URL;
+}
 
 function sessionHeader(token: string) {
   return { authorization: `Session ${token}` };
@@ -21,7 +26,7 @@ test(
   "authenticated tenant context, roles, invitations, audit actors, and revocation",
   { skip: !runDatabaseTests },
   async () => {
-    const prisma = createPrismaClient(databaseUrl);
+    const prisma = createPrismaClient(databaseUrl());
     const organizationId = randomUUID();
     const otherOrganizationId = randomUUID();
     const ownerId = randomUUID();
@@ -33,10 +38,23 @@ test(
     const ownerPassword = "Owner-Integration-2026!";
     const invitedEmail = `viewer-${randomUUID()}@example.com`;
     const invitedPassword = "Viewer-Integration-2026!";
+    const disconnectedSessions: string[] = [];
+    const disconnectedUsers: Array<{ organizationId: string; userId: string }> = [];
     const app = buildApp({
-      authService: new PrismaAuthService(prisma),
+      authService: new PrismaAuthService(prisma, passwordPepper),
       incidentRepository: new PrismaIncidentRepository(prisma),
       serviceRepository: new PrismaServiceRepository(prisma),
+      realtimeSessionRevoker: {
+        async disconnectSession(sessionId) {
+          disconnectedSessions.push(sessionId);
+        },
+        async disconnectUser(disconnectedOrganizationId, userId) {
+          disconnectedUsers.push({
+            organizationId: disconnectedOrganizationId,
+            userId,
+          });
+        },
+      },
       logger: false,
     });
 
@@ -56,7 +74,11 @@ test(
           id: ownerId,
           email: ownerEmail,
           displayName: "Integration Owner",
-          passwordHash: await hashPassword(ownerPassword),
+          passwordHash: await hash(ownerPassword, {
+            memoryCost: 19_456,
+            timeCost: 2,
+            parallelism: 1,
+          }),
           organizationMemberships: {
             create: { organizationId, role: "OWNER" },
           },
@@ -89,6 +111,10 @@ test(
         payload: { email: ownerEmail, password: ownerPassword },
       });
       assert.equal(login.statusCode, 200);
+      assert.match(
+        (await prisma.user.findUniqueOrThrow({ where: { id: ownerId } })).passwordHash,
+        /^argon2id-pepper-v1:/,
+      );
       const ownerToken = login.json().session.token as string;
 
       const session = await app.inject({
@@ -119,10 +145,29 @@ test(
       });
       assert.equal(createdIncident.statusCode, 201);
       const incidentId = createdIncident.json().incident.id as string;
+      assert.equal(createdIncident.json().incident.version, 1);
       assert.equal(
         await prisma.incidentActivity.count({ where: { incidentId, actorUserId: ownerId } }),
         3,
       );
+
+      const updatedIncident = await app.inject({
+        method: "PATCH",
+        url: `/v1/incidents/${incidentId}`,
+        headers: sessionHeader(ownerToken),
+        payload: { status: "acknowledged" },
+      });
+      assert.equal(updatedIncident.statusCode, 200);
+      assert.equal(updatedIncident.json().incident.version, 2);
+
+      const noOpUpdate = await app.inject({
+        method: "PATCH",
+        url: `/v1/incidents/${incidentId}`,
+        headers: sessionHeader(ownerToken),
+        payload: { status: "acknowledged" },
+      });
+      assert.equal(noOpUpdate.statusCode, 200);
+      assert.equal(noOpUpdate.json().incident.version, 2);
 
       const invitationResponse = await app.inject({
         method: "POST",
@@ -187,6 +232,7 @@ test(
         payload: { status: "suspended" },
       });
       assert.equal(suspendViewer.statusCode, 200);
+      assert.deepEqual(disconnectedUsers, [{ organizationId, userId: viewerId }]);
       const suspendedSession = await app.inject({
         method: "GET",
         url: "/v1/auth/session",
@@ -217,6 +263,9 @@ test(
         payload: { organizationSlug: `other-${otherOrganizationId}` },
       });
       assert.equal(switched.statusCode, 200);
+      assert.deepEqual(disconnectedSessions, [
+        login.json().session.context.sessionId,
+      ]);
       const rotatedOwnerToken = switched.json().session.token as string;
       assert.notEqual(rotatedOwnerToken, ownerToken);
       assert.equal(switched.json().session.context.organizationId, otherOrganizationId);
@@ -250,8 +299,8 @@ test(
   "login throttling locks repeated invalid credentials",
   { skip: !runDatabaseTests },
   async () => {
-    const prisma = createPrismaClient(databaseUrl);
-    const authService = new PrismaAuthService(prisma);
+    const prisma = createPrismaClient(databaseUrl());
+    const authService = new PrismaAuthService(prisma, passwordPepper);
     const app = buildApp({ authService, logger: false });
     const email = `missing-${randomUUID()}@example.com`;
     const keyHash = createHash("sha256")

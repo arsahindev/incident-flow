@@ -2,9 +2,9 @@
 
 IncidentFlow is a multi-tenant incident intake, routing, notification, and response-coordination SaaS for backend teams. It is being built as a production-minded full-stack portfolio project, one working vertical slice at a time.
 
-## Current milestone: Phase 2
+## Current milestone: Phase 3
 
-The authenticated manual incident lifecycle and service-catalog foundation are working locally:
+Authenticated realtime incident coordination is working locally on top of the Phase 2 identity and service-catalog foundation:
 
 - a pnpm monorepo;
 - a Next.js dashboard with incident creation, listing, detail, lifecycle controls, and URL-backed filters;
@@ -20,9 +20,17 @@ The authenticated manual incident lifecycle and service-catalog foundation are w
 - centralized owner/admin/responder/viewer permissions enforced by the API and reflected in the UI;
 - cross-tenant IDOR, role-boundary, invitation, session-rotation/revocation, suspended-membership, and disabled-user integration tests;
 - shared Zod identity/session contracts and a stable coded API error envelope with request correlation IDs;
-- a tested native-fetch backend-for-frontend boundary covering `204`, network failures, malformed/non-JSON responses, and runtime response validation.
+- shared runtime incident and realtime signal contracts with a monotonic version on every incident;
+- a tested native-fetch backend-for-frontend boundary covering `204`, network failures, malformed/non-JSON responses, and runtime response validation;
+- a transport-independent `RealtimePublisher` application port with a no-op test implementation;
+- a Socket.IO adapter authenticated through the existing revocable session system, with strict browser-origin validation;
+- server-derived organization and user rooms plus tenant-authorized incident-room joins;
+- live incident creation, status, assignment, affected-service, and activity signals;
+- client-side stale-signal rejection and canonical API refetch after accepted signals and reconnects;
+- bounded inbound/outbound payloads, volatile backpressure handling, slow-client disconnection, session revalidation, and metrics seams;
+- focused socket integration tests for authentication, room authorization, tenant isolation, revocation, and backpressure.
 
-WebSockets, queues, AWS resources, and AI are intentionally deferred to their roadmap phases.
+Account lifecycle and recovery is planned for Phase 3.5. Queues, webhook intake, AWS resources, broad incident notifications, and AI remain intentionally deferred to their roadmap phases.
 
 ## Prerequisites
 
@@ -34,6 +42,8 @@ WebSockets, queues, AWS resources, and AI are intentionally deferred to their ro
 
 ```bash
 cp .env.example .env
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
 pnpm install
 docker compose up -d db
 pnpm db:migrate
@@ -45,6 +55,7 @@ The applications are then available at:
 
 - Web dashboard: <http://localhost:3000>
 - API health check: <http://localhost:4000/health>
+- API readiness check: <http://localhost:4000/ready>
 
 The idempotent development seed creates this local owner account:
 
@@ -59,6 +70,23 @@ The development command runs the contracts compiler, web app, and API together. 
 pnpm --filter @incidentflow/web dev
 pnpm --filter @incidentflow/api dev
 ```
+
+The repository includes focused `api.code-workspace`, `web.code-workspace`, and `contracts.code-workspace` files. Each opens only its application/package, so Quick Open and workspace search do not include sibling projects, while Source Control still discovers the parent monorepo. Each focused workspace also provides relevant Run and Debug entries. The API server debugger first compiles with `tsc`, runs `dist/server.js`, and maps breakpoints back to `src` through emitted source maps; the Next.js full-stack configuration attaches to server code and opens a Chrome debugger for client code; the contracts configuration debugs its Node test suite. Ensure PostgreSQL is running and the API/web environment files exist before starting application debuggers.
+
+Environment configuration is owned by the process that consumes it. The root `.env` configures only the Docker Compose PostgreSQL container, `apps/api/.env` configures Fastify and Prisma, and `apps/web/.env.local` configures Next.js. `DATABASE_URL`, `WEB_ORIGIN`, `PASSWORD_PEPPER`, `API_URL`, and `NEXT_PUBLIC_REALTIME_URL` are required and validated with field-specific startup/build errors; bounded listener/realtime tuning retains documented safe defaults. Generate a production pepper with `openssl rand -base64 32`, store it separately from PostgreSQL in the deployment secret store, and never log or commit it. The checked-in API example contains a local-development-only value. `NEXT_PUBLIC_REALTIME_URL` is public and frozen into the browser bundle during `next build`, so deployments must provide the same value during build and startup; changing only the startup value cannot rewrite the bundle. `API_URL` remains server-only runtime configuration. Configuration failures are logged without values and are never reclassified as API network failures.
+
+The realtime endpoint shares the API listener and accepts the `incidentflow_session` cookie only during the Socket.IO handshake. It requires the exact configured `WEB_ORIGIN`; browser code never receives the opaque session token. Local development works across ports because both applications use the `localhost` host. A production deployment must expose the socket endpoint on a host/path where the web session cookie is available, normally through a same-origin reverse proxy.
+
+Realtime messages intentionally contain only an incident ID, event type, schema version, incident version, and timestamp. They are update signals, not canonical state or durable events: the dashboard refetches the normal authenticated API after a signal or reconnect.
+
+## Sharing a Phase 3 demo
+
+The current milestone can be shared from one HTTPS origin with a private API
+process, PostgreSQL, and a WebSocket-capable reverse proxy. See the
+[Phase 3 demo deployment runbook](docs/phase-3-demo-deployment.md) for the
+required topology, secrets, migration command, start commands, proxy example,
+and known Phase 3 limits. It intentionally does not represent the later Phase
+10 production-platform scope.
 
 ## Quality checks
 
@@ -116,8 +144,8 @@ incidentflow/
 - [Identity and authorization ERD](diagrams/auth.svg)
 - [Incident and service-catalog ERD](diagrams/incident-and-service.svg)
 
-## Next milestone
+## Roadmap boundary
 
-Phase 3 will add authenticated real-time incident coordination through an adapter boundary, organization/incident/user rooms, canonical-state refetch after reconnect, and focused socket integration tests.
+Phase 3 is complete, committed, and ready for pull-request review. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
 
-Phase 2 decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md) and [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md).
+Architecture decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md), [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md), and [ADR 0003: authenticated realtime update signals](docs/decisions/0003-authenticated-realtime-update-signals.md).

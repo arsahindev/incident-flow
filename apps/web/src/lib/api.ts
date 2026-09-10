@@ -2,6 +2,8 @@ import "server-only";
 
 import {
   authSessionResponseSchema,
+  incidentResponseSchema,
+  incidentsResponseSchema,
   invitationResponseSchema,
   membersResponseSchema,
   organizationsResponseSchema,
@@ -22,15 +24,12 @@ import type {
 } from "./types";
 import { sessionCookieName } from "./auth-constants";
 import { ApiError, parseApiResponse } from "./api-response";
+import { getServerEnvironment } from "./env/server";
 
 export { ApiError } from "./api-response";
 
 function apiUrl(path: string) {
-  const baseUrl =
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    "http://localhost:4000";
-  return new URL(path, baseUrl).toString();
+  return new URL(path, getServerEnvironment().API_URL).toString();
 }
 
 export async function requestApi<T>(
@@ -38,19 +37,27 @@ export async function requestApi<T>(
   init?: RequestInit,
   responseSchema?: ZodType<T>,
 ): Promise<T> {
-  const sessionToken = (await cookies()).get(sessionCookieName)?.value;
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(sessionCookieName)?.value;
+
+  const headers = new Headers(init?.headers);
+  if (!headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  if (sessionToken) {
+    headers.set("authorization", `Session ${sessionToken}`);
+  }
+
+  const url = apiUrl(path);
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), {
+    response = await fetch(url, {
       ...init,
-      cache: "no-store",
-      headers: {
-        "content-type": "application/json",
-        ...(sessionToken ? { authorization: `Session ${sessionToken}` } : {}),
-        ...init?.headers,
-      },
+      cache: init?.cache ?? "no-store",
+      headers,
     });
-  } catch {
+  } catch (error) {
+    console.error("Network error while making API request:", error);
     throw new ApiError("Unable to reach the API", 0, "network_error");
   }
   return parseApiResponse(response, responseSchema);
@@ -72,11 +79,11 @@ export async function requireSession() {
   return session;
 }
 
-export function getMembers() {
+export async function getMembers() {
   return requestApi("/v1/members", undefined, membersResponseSchema);
 }
 
-export function getOrganizations() {
+export async function getOrganizations() {
   return requestApi(
     "/v1/auth/organizations",
     undefined,
@@ -84,7 +91,7 @@ export function getOrganizations() {
   );
 }
 
-export function getInvitation(token: string) {
+export async function getInvitation(token: string) {
   return requestApi(
     `/v1/invitations/${token}`,
     undefined,
@@ -92,7 +99,11 @@ export function getInvitation(token: string) {
   );
 }
 
-export function getIncidents(filters: {
+export async function getTeams() {
+  return requestApi<{ teams: Team[] }>("/v1/teams");
+}
+
+export async function getIncidents(filters: {
   serviceId?: string;
   teamId?: string;
   status?: IncidentStatus;
@@ -107,21 +118,19 @@ export function getIncidents(filters: {
   return requestApi<{
     incidents: IncidentSummary[];
     pagination: IncidentPagination;
-  }>(`/v1/incidents${query}`);
+  }>(`/v1/incidents${query}`, undefined, incidentsResponseSchema);
+}
+export async function getIncident(incidentId: string) {
+  return requestApi<{ incident: IncidentDetail }>(
+    `/v1/incidents/${incidentId}`,
+    undefined,
+    incidentResponseSchema,
+  );
 }
 
-export function getTeams() {
-  return requestApi<{ teams: Team[] }>("/v1/teams");
-}
-
-export function getIncident(incidentId: string) {
-  return requestApi<{ incident: IncidentDetail }>(`/v1/incidents/${incidentId}`);
-}
-
-export function getServices() {
+export async function getServices() {
   return requestApi<{ services: Service[] }>("/v1/services");
 }
-
-export function getService(serviceId: string) {
+export async function getService(serviceId: string) {
   return requestApi<{ service: ServiceDetail }>(`/v1/services/${serviceId}`);
 }
