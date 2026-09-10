@@ -1113,7 +1113,7 @@ pnpm audit --prod --audit-level high
 
 1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
 2. Preserve the Phase 3 `RealtimePublisher`/Socket.IO boundary, server-derived rooms, strict-origin cookie handshake, best-effort signal semantics, and canonical-refetch/version guarantees.
-3. Remain on `phase_3` while the user reviews the committed Phase 3 work. The non-database quality gate is passing; the real-PostgreSQL checks still need a running Docker daemon locally (and run in CI). Keep any requested fixes within Phase 3, and do not switch or update branches on the user's behalf unless explicitly requested.
+3. Remain on `phase_3` while the user reviews the committed Phase 3 work. The full quality gate, including real-PostgreSQL integration tests and Prisma migration status, is passing. Keep any requested fixes within Phase 3, and do not switch or update branches on the user's behalf unless explicitly requested.
 4. The user owns opening and merging the Phase 3 pull request. Do not begin Phase 3.5 until they confirm the merge, local `main` update, and `phase_3_5` branch creation.
 5. Begin Phase 3.5 only after the user confirms Phase 3 was merged, local `main` was updated, and the `phase_3_5` branch was created. Implement its account lifecycle/recovery scope incrementally before Phase 4.
 6. Continue migrating endpoint success schemas into `packages/contracts` when their APIs are actively changed; keep the stable coded error contract centralized.
