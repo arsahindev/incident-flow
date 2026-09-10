@@ -487,20 +487,21 @@ Keep HTTP, domain/application logic, persistence, and external transports separa
 
 ### Realtime design
 
-Core domain services must not import Socket.IO directly. Define a port such as:
+Core domain services must not import Socket.IO directly. Phase 3 implements this port:
 
 ```ts
 interface RealtimePublisher {
-  publishToOrganization(
+  publishIncidentSignal(
     organizationId: string,
-    event: RealtimeEvent
+    incidentId: string,
+    signal: RealtimeIncidentSignal
   ): Promise<void>;
 }
 ```
 
-Implementations can be:
+Current and planned implementations are:
 
-- `SocketIoRealtimePublisher` for local development.
+- `SocketIoRealtimeAdapter` for local development.
 - `ApiGatewayWebSocketPublisher` for an AWS deployment.
 - `NoopRealtimePublisher` for tests.
 
@@ -512,9 +513,11 @@ incident:{incidentId}
 user:{userId}
 ```
 
-Events may include `incident.created`, `incident.updated`, `aiBrief.updated`, and `notification.created`.
+Phase 3 incident signals are `incident.created`, `incident.status_changed`, `incident.assignment_changed`, `incident.affected_services_changed`, and `incident.activity_updated`. They contain only a contract schema version, incident ID, monotonic incident version, and timestamp. Socket rooms, cookie parsing, origin checks, buffering policy, and Socket.IO types stay inside the adapter.
 
-WebSocket events are fast update signals, not the source of truth. On reconnection, clients fetch canonical state from the normal API.
+The Socket.IO handshake is the narrow ambient-cookie exception to the normal backend-for-frontend HTTP flow: it reads the existing `HttpOnly` session cookie server-side, requires the exact configured web origin, and reuses the authoritative session service. Organization and user rooms are joined only from authenticated context. Incident-room joins accept only an incident ID and reauthorize tenant membership and `incidents.read` server-side.
+
+WebSocket events are fast, best-effort update signals, not the source of truth or durable domain events. Clients reject non-newer incident versions and refetch canonical API state after accepted signals and reconnects. Logout, organization switching, membership suspension, periodic session revalidation, bounded payloads/room counts, volatile backpressure drops, slow-client disconnection, and transport-neutral metrics seams are part of the Phase 3 boundary. See ADR 0003.
 
 ---
 
@@ -907,21 +910,40 @@ Do not add dependency graphs, automatic priority mapping, broad CMDB fields, or 
 - Users, organization memberships, team memberships, invitations, session revocation, organization switching, organization-local suspension, and global disabled-user behavior are implemented through an additive migration and idempotent development seed.
 - A centralized named-action permission matrix defines owner, admin, responder, and viewer access. API checks are authoritative; the web UI also removes controls users cannot exercise.
 - All protected routes derive organization/user context from the validated session. The former fixed development organization is no longer an authorization mechanism.
-- Argon2id passwords, generic invalid-login responses, database-backed failure throttling, seven-day expiry, logout revocation, organization-switch rotation, hashed single-use 48-hour invitation tokens, and a last-active-owner invariant form the initial security baseline.
+- Argon2id passwords use automatic per-password salts plus a required, separately stored native Argon2 secret (`PASSWORD_PEPPER`) of at least 32 random bytes. Stored hashes carry a pepper-version marker without containing the pepper; legacy Phase 2 hashes migrate after successful authentication, unknown versions fail closed, and loss/compromise of the single currently supported pepper requires password resets. Generic invalid-login responses, database-backed failure throttling, seven-day expiry, logout revocation, organization-switch rotation, hashed single-use 48-hour invitation tokens, and a last-active-owner invariant form the initial security baseline.
 - Because the browser never authenticates directly to Fastify with ambient cookies, cross-site requests cannot carry API authority. Next.js Server Actions provide the cookie-authenticated mutation boundary and same-origin validation; any future conventional cookie-authenticated route must add explicit CSRF protection.
 - Incident/service/activity/permission changes record actor identity and material organization administration actions also write audit-log records.
 - Real-PostgreSQL tests cover cross-tenant IDOR attempts, viewer write denial, invitations, team membership, last-owner protection, organization-switch token rotation, membership suspension/revocation, disabled users, and login throttling.
 - `packages/contracts` now provides runtime Zod identity/session schemas and the common coded API error envelope. Fastify maps expected and unexpected failures centrally with correlation IDs and without leaking internal details.
 - The Next.js backend-for-frontend deliberately keeps native `fetch`; its tested response parser handles no-content, malformed/empty JSON, non-JSON upstream failures, network failure classification, and structured `ApiError` metadata. Identity/session/member responses are runtime-validated first, while incident/service response contracts will migrate incrementally.
-- Deliberately deferred identity capabilities include password reset/change, MFA, enterprise SSO, personal API tokens, and end-user session-device management.
+- Password reset/change and controlled first-owner organization registration are planned for Phase 3.5. MFA, enterprise SSO, personal API tokens, and end-user session-device management remain deliberately deferred beyond that milestone.
 
-### Phase 3 — real-time incident coordination
+### Phase 3 — real-time incident coordination (complete)
 
-- Socket.IO server behind `RealtimePublisher`; domain/application code must not import Socket.IO.
-- Authenticated organization, incident, and user rooms with authorization on join.
-- Live incident create/status/assignment/affected-service/activity updates.
-- Reconnect behavior refetches canonical API state; sequence/version information prevents stale updates from winning.
-- Backpressure/payload limits, connection metrics, safe disconnect/revocation behavior, and tests using `NoopRealtimePublisher` plus selected socket integration tests.
+- Socket.IO is behind `RealtimePublisher`; domain/application code does not import Socket.IO, and publication happens only after the business transaction commits.
+- Handshakes reuse the opaque server-managed session cookie with an exact-origin check. Organization/user rooms are server-derived, and incident rooms require an organization-scoped authorization query.
+- Live incident create/status/assignment/affected-service/activity signals use shared runtime contracts and a positive monotonic incident version.
+- The browser treats messages as hints, rejects stale/equal versions, and refetches canonical API state after accepted signals and reconnects.
+- Default 4 KiB inbound and 1 KiB outbound payload limits, bounded incident-room membership, volatile delivery, pending-packet/backpressure drops, repeated-slow-client disconnection, and periodic session revalidation bound resource use.
+- Logout/organization-switch session rotation and membership suspension proactively disconnect affected sockets, with periodic validation as a fail-closed fallback.
+- `RealtimeMetrics`, `InMemoryRealtimeMetrics`, `NoopRealtimeMetrics`, `NoopRealtimePublisher`, publisher/application tests, client sequencing tests, and focused Socket.IO integration tests provide the initial operational/testing seams.
+- Realtime is deliberately best-effort and single-process in this phase. Durable publication/outbox delivery and distributed socket fan-out are not claimed.
+
+### Phase 3.5 — account lifecycle and recovery (planned)
+
+- Preserve invitation acceptance as the only way for a user to join an existing organization. Do not add unrestricted organization joining or silently infer tenant membership from an email domain.
+- Add a controlled self-service bootstrap flow for a new customer: verify email ownership, then atomically create the user, organization, active owner membership, and initial server-managed session. Normalize organization identity, reject conflicting user/organization records safely, rate-limit requests, and audit successful bootstrap without exposing account existence.
+- Replace the optional `organizationSlug` on the initial password-login request with an explicit two-step multi-organization flow. After valid credentials, create a normal session immediately only when exactly one active membership exists. When several exist, return the allowed organization summaries plus a cryptographically random, purpose-bound, single-use organization-selection challenge with a short expiry; store only its digest and do not create a session yet. The Next.js backend-for-frontend keeps the raw challenge in a separate short-lived `HttpOnly`, `SameSite=Lax`, production-`Secure` cookie so browser JavaScript never receives it.
+- Complete multi-organization login through a dedicated selection endpoint. It must consume the challenge atomically, re-check the user and selected membership are still active, reject organizations outside the challenged user, create one server-managed session for the selected organization, delete the challenge cookie, and fail closed on expiry, replay, revocation, or concurrent consumption. A slug is a selection value, never proof of authorization. Zero active memberships retain the generic invalid-login response. Invitation acceptance and verified first-owner bootstrap may create a session directly because their organization context is already unambiguous.
+- Introduce a provider-neutral `TransactionalEmailSender` application port before selecting an email service. Production/hosted environments must deliver verification and recovery links through a configured provider; tests use a no-op/capturing adapter, and local development may use an explicitly local inbox/capture adapter. Never place raw action tokens in ordinary application logs. This narrow authentication-email capability must not grow into the Phase 6 incident-notification system.
+- Add forgot-password initiation with the same generic response whether or not the account exists, database-backed throttling, and a cryptographically random, purpose-bound, short-lived, single-use reset token stored only as a digest. Do not reuse invitation tokens or session tokens for recovery.
+- Add reset-password completion that consumes the token transactionally, writes a current peppered/versioned Argon2id password hash, invalidates every other outstanding reset token, revokes all sessions, disconnects all realtime sockets for the user, records a material audit event, and requires a new login.
+- Add authenticated change-password behavior that verifies the current password, writes a current peppered/versioned hash, revokes every existing session, disconnects realtime sockets, and issues one freshly rotated session for the selected organization so the initiating browser can continue safely.
+- Keep password-reset and verification tokens out of URLs stored in analytics/referrer logs where practical; pages must avoid third-party resources, responses must use `no-store`, and token values must never enter structured logs or audit metadata.
+- Define a bounded retention policy for expired/revoked sessions and consumed/expired account-action tokens. Delete them in indexed batches through an explicit maintenance command/job; permanent security history belongs in sanitized audit records rather than indefinite credential-table retention.
+- Extend shared runtime contracts and the Next.js backend-for-frontend with register/verify, forgot/reset, change-password, and organization-selection forms while keeping Fastify authoritative. Preserve generic authentication errors, request correlation, origin/CSRF boundaries, password-pepper requirements, last-owner protection, and server-derived tenant authorization.
+- Add unit and real-PostgreSQL integration tests for enumeration resistance, expiry, single use, replay/concurrency, wrong-purpose tokens, throttling, cross-account and cross-tenant attempts, zero/one/many-membership login behavior, organization-challenge replay and membership revocation, password-hash versioning, session/socket revocation, atomic owner bootstrap, email-delivery failure boundaries, and cleanup batching.
+- Do not include MFA, OAuth/social login, enterprise SSO, domain-claim automation, billing/provisioning, personal API tokens, broad notification delivery, or end-user device/session management in Phase 3.5.
 
 ### Phase 4 — source integrations and secure webhook intake
 
@@ -1031,22 +1053,28 @@ Describe this milestone as ITIL-aligned, not certified.
 ## Current code state — 2026-08-27
 
 - Repository: `/Users/arsahin/Developer/incidentflow`.
-- Git is initialized. At the time of this handoff, the checked-out branch is `phase_2`; always inspect current branch/status before modifying files.
-- Phase 0 foundation, Phase 1 manual incident lifecycle, Phase 1.5 service catalog/affected services, and Phase 2 identity/authorization are implemented on `phase_2` in focused commits. Inspect Git history and PR state before assuming they are merged to `main`.
+- Git is initialized. At the time of this handoff, the checked-out branch is `phase_3`; always inspect current branch/status before modifying files.
+- Phase 0 foundation, Phase 1 manual incident lifecycle, Phase 1.5 service catalog/affected services, and Phase 2 identity/authorization are merged to `main` at merge commit `59e8877`. Phase 3 is implemented as uncommitted local work on `phase_3`; do not commit or push without explicit user approval.
 - Phase 1 baseline commit: `e43f355 feat: complete phase 1 manual incident lifecycle`.
 - pnpm workspace contains `apps/web`, `apps/api`, and the active `packages/contracts` package. The contracts package builds shared ESM/Zod identity and error contracts before dependent applications.
 - Next.js dashboard supports login/logout, invitation acceptance, member/role/access/team administration, permission-aware incident/service workflows, activity history, URL-backed filtering, pagination, and service catalog/detail/environment management.
 - Fastify API exposes health, authentication/session, invitation/member/team-access, service, service-environment, and incident lifecycle routes with Zod validation and repository seams.
-- Prisma/PostgreSQL includes users, organization/team memberships, sessions, invitations, login throttles, audit logs, organizations, teams, services, service environments, incidents, affected-service joins, and actor-aware incident activity. Organization-scoped constraints protect tenant boundaries.
+- Prisma/PostgreSQL includes users, organization/team memberships, sessions, invitations, login throttles, audit logs, organizations, teams, services, service environments, incidents with monotonic positive versions, affected-service joins, and actor-aware incident activity. Organization-scoped constraints protect tenant boundaries.
 - The idempotent seed creates the development organization, an owner (`admin@incidentflow.local`), Platform team, five representative services, and realistic environments. Its local-only password is documented in the README.
 - The API resolves active user and organization membership on every protected request from a hashed opaque-session record. Central named permissions replace scattered role comparisons; suspended memberships, disabled users, expired sessions, and revoked sessions fail closed.
-- The web uses an HttpOnly cookie only as a backend-for-frontend credential; Fastify does not accept browser ambient cookies. The optimistic Next.js proxy checks cookie presence, while the API remains authoritative and safely handles stale/invalid cookies.
+- The web uses an HttpOnly cookie as the backend-for-frontend credential; regular Fastify HTTP routes do not accept browser ambient cookies. The Phase 3 Socket.IO handshake is the narrow exact-origin exception described in ADR 0003. The optimistic Next.js proxy checks cookie presence, while the API remains authoritative and safely handles stale/invalid cookies.
 - Auth/security decisions and deliberate deferrals are recorded in ADR 0001.
 - Native-fetch response handling, runtime contract validation, and the coded correlated-error format are recorded in ADR 0002.
+- Authenticated realtime update signals, the Socket.IO cookie/origin boundary, room authorization, canonical refetch strategy, delivery limits, and deliberate best-effort/single-process guarantees are recorded in ADR 0003.
+- The API application layer publishes incident create/status/assignment/affected-service/activity signals through `RealtimePublisher` only after repository transactions complete. Socket.IO remains confined to `SocketIoRealtimeAdapter`; ordinary tests use `NoopRealtimePublisher`.
+- The Socket.IO adapter authenticates with the existing revocable session service, automatically joins server-derived organization/user rooms, authorizes incident rooms against the authenticated organization, bounds payloads/room counts/backpressure, periodically revalidates sessions, and exposes transport-neutral metrics seams.
+- The dashboard and incident detail show connection state, runtime-validate signals, ignore stale/equal incident versions, and use `router.refresh()` to fetch canonical authenticated API data on updates and reconnects.
+- Web and API configuration now fail fast through separate Zod boundaries. Required database/origin/API/realtime URLs and the password pepper have no silent fallbacks, public Next.js configuration is checked during build and must be supplied consistently at startup because its bundled value is immutable, server configuration is checked at process startup, Prisma generation remains install-safe while migration/seed commands validate their required database/pepper inputs, and sanitized structured failures preserve configuration errors instead of misclassifying them as network errors. Root, API, and web environment examples reflect their actual loading boundaries; API liveness and PostgreSQL-backed readiness are separate endpoints.
+- `docs/phase-3-demo-deployment.md` documents a deliberately bounded, single-origin HTTPS demo deployment. It keeps the API private behind a WebSocket-capable reverse proxy so the existing host-only session cookie can authenticate the Socket.IO handshake. This is a sharing path for the current milestone, not a substitute for the Phase 10 cloud platform or production-readiness work.
 - Baseline GitHub Actions CI provisions PostgreSQL and runs frozen installation, migration deployment, lint, typecheck, unit tests, database integration tests, production build, and a high-severity production-dependency audit.
-- PostgreSQL runs through Docker Compose with persistent storage. Phase 2 was verified through lint, standalone typecheck, shared-contract/API/web-wrapper tests, warning-free real-PostgreSQL identity/authorization and constraint tests, production builds, a high-severity production-dependency audit, and a browser journey covering login, invitation/onboarding, owner administration, viewer UI restrictions, direct admin-page denial, and logout.
+- PostgreSQL runs through Docker Compose with persistent storage. Phase 3 was verified through warning-free lint and typecheck, shared-contract/application/client sequencing tests, focused loopback Socket.IO integration tests, the additive migration and current migration-status check, warning-free real-PostgreSQL identity/authorization/constraint/version tests, production builds, a high-severity production-dependency audit, and a local login-page smoke test.
 - The database contains development records created during verification, including an Order Routing API service, preview environment, linked incident, and a browser-verification viewer account; do not assume it is empty.
-- Phase 3 authenticated real-time incident coordination is the recommended next milestone. Do not begin it until the user approves the next phase.
+- Phase 3 authenticated real-time incident coordination is implemented locally. Phase 3.5 account lifecycle and recovery is the planned next milestone, but it must not begin until the user finishes reviewing Phase 3, explicitly requests the Phase 3 commits, merges them to `main`, updates local `main`, and creates the `phase_3_5` branch. Do not begin Phase 4 before Phase 3.5 is completed and approved.
 - Existing uncommitted user changes may be present. Always inspect and preserve them; never treat a dirty worktree as disposable.
 
 ### Local development
@@ -1054,6 +1082,8 @@ Describe this milestone as ITIL-aligned, not certified.
 ```bash
 cd /Users/arsahin/Developer/incidentflow
 cp .env.example .env         # only if .env does not already exist
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
 pnpm install
 docker compose up -d db
 pnpm db:migrate
@@ -1082,14 +1112,13 @@ pnpm audit --prod --audit-level high
 ## Immediate open tasks for the coding assistant
 
 1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
-2. Confirm whether the completed `phase_2` pull request has merged; do not build Phase 3 on an obsolete or unmerged base.
-3. Begin Phase 3 only with user approval, preferably in a fresh task: introduce a `RealtimePublisher` abstraction before Socket.IO enters application/domain code.
-4. Authenticate socket connections from the existing session system and authorize organization, incident, and user room joins server-side.
-5. Publish incident creation/status/assignment/affected-service/activity changes; reconnecting clients must refetch canonical API state and reject stale updates using version/sequence information.
-6. Add payload/backpressure limits, connection/room metrics, revocation/disconnect behavior, a no-op test publisher, and selected socket integration tests.
-7. Continue migrating endpoint success schemas into `packages/contracts` when their APIs are actively changed; keep the stable coded error contract centralized.
-8. Keep the milestone local and runnable. Do not jump to webhooks, AWS, queues, AI, Kafka, notifications, or on-call before their roadmap phases.
-9. Keep this context, README, ADRs, and roadmap status synchronized with implemented behavior.
+2. Preserve the Phase 3 `RealtimePublisher`/Socket.IO boundary, server-derived rooms, strict-origin cookie handshake, best-effort signal semantics, and canonical-refetch/version guarantees.
+3. Remain on `phase_3` while the user reviews it. Run the full documented quality gate and a browser-level two-session realtime journey before any requested commit; keep discovered fixes within Phase 3, and do not commit or push until explicitly asked.
+4. After the user approves, make the requested progressive Phase 3 commits and stop for the user to open and merge the pull request. Do not switch or update branches on the user's behalf unless explicitly requested.
+5. Begin Phase 3.5 only after the user confirms Phase 3 was merged, local `main` was updated, and the `phase_3_5` branch was created. Implement its account lifecycle/recovery scope incrementally before Phase 4.
+6. Continue migrating endpoint success schemas into `packages/contracts` when their APIs are actively changed; keep the stable coded error contract centralized.
+7. Keep the milestone local and runnable. Do not begin Phase 4 or jump to webhooks, AWS, queues, AI, Kafka, broad notifications, or on-call without explicit user approval.
+8. Keep this context, README, ADRs, and roadmap status synchronized with implemented behavior.
 
 ## Working preferences for the coding assistant
 
