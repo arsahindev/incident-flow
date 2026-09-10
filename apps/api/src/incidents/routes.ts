@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 
 import { requirePermission } from "../auth/permissions.js";
 import { sendValidationError } from "../http/responses.js";
+import type { RealtimePublisher } from "../realtime/publisher.js";
 import type { IncidentRepository } from "./repository.js";
 import {
   createIncidentSchema,
@@ -9,9 +10,11 @@ import {
   listIncidentsQuerySchema,
   updateIncidentSchema,
 } from "./schemas.js";
+import { IncidentApplicationService } from "./service.js";
 
 type IncidentRouteOptions = {
   repository: IncidentRepository;
+  realtimePublisher: RealtimePublisher;
 };
 
 export async function registerIncidentRoutes(
@@ -19,6 +22,11 @@ export async function registerIncidentRoutes(
   options: IncidentRouteOptions,
 ) {
   const { repository } = options;
+  const incidentService = new IncidentApplicationService(
+    repository,
+    options.realtimePublisher,
+    (error) => app.log.error({ err: error }, "Realtime incident publication failed"),
+  );
 
   app.get("/v1/teams", async (request) => {
     requirePermission(request.auth, "teams.read");
@@ -37,11 +45,7 @@ export async function registerIncidentRoutes(
     const parsed = createIncidentSchema.safeParse(request.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);
 
-    const incident = await repository.createIncident(
-      request.auth.organizationSlug,
-      parsed.data,
-      request.auth.userId,
-    );
+    const incident = await incidentService.createIncident(request.auth, parsed.data);
     return reply.code(201).send({ incident });
   });
 
@@ -67,11 +71,10 @@ export async function registerIncidentRoutes(
     if (!body.success) return sendValidationError(reply, body.error);
 
     return {
-      incident: await repository.updateIncident(
-        request.auth.organizationSlug,
+      incident: await incidentService.updateIncident(
+        request.auth,
         params.data.incidentId,
         body.data,
-        request.auth.userId,
       ),
     };
   });

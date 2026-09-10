@@ -4,13 +4,15 @@ import { test } from "node:test";
 
 import { buildApp } from "./app.js";
 import { permissionsForRole } from "./auth/permissions.js";
+import { loadDatabaseConfig } from "./config.js";
 import { createPrismaClient } from "./database.js";
 import { PrismaIncidentRepository } from "./incidents/prisma-repository.js";
 
 const runDatabaseTests = process.env.RUN_DATABASE_TESTS === "true";
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  "postgresql://incidentflow:incidentflow_dev@localhost:5432/incidentflow";
+
+function databaseUrl() {
+  return loadDatabaseConfig().DATABASE_URL;
+}
 
 function hasPrismaCode(error: unknown, code: string) {
   return (
@@ -32,7 +34,7 @@ test(
   "service catalog constraints reject cross-tenant affected services",
   { skip: !runDatabaseTests },
   async () => {
-    const prisma = createPrismaClient(databaseUrl);
+    const prisma = createPrismaClient(databaseUrl());
     try {
       const organizationA = randomUUID();
       const organizationB = randomUUID();
@@ -84,7 +86,7 @@ test(
   "service catalog constraints allow only one primary service per incident",
   { skip: !runDatabaseTests },
   async () => {
-    const prisma = createPrismaClient(databaseUrl);
+    const prisma = createPrismaClient(databaseUrl());
     try {
       const organizationId = randomUUID();
       const incidentId = randomUUID();
@@ -140,7 +142,7 @@ test(
   "incident API rejects an affected service owned by another organization",
   { skip: !runDatabaseTests },
   async () => {
-    const prisma = createPrismaClient(databaseUrl);
+    const prisma = createPrismaClient(databaseUrl());
     const organizationA = randomUUID();
     const organizationB = randomUUID();
     const serviceA = randomUUID();
@@ -209,7 +211,7 @@ test(
   "database rejects expiry on a non-ephemeral service environment",
   { skip: !runDatabaseTests },
   async () => {
-    const prisma = createPrismaClient(databaseUrl);
+    const prisma = createPrismaClient(databaseUrl());
     const organizationId = randomUUID();
     const serviceId = randomUUID();
 

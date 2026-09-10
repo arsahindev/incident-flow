@@ -1,14 +1,11 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { hash } from "@node-rs/argon2";
-import { config } from "dotenv";
 
+import { hashPassword } from "../src/auth/passwords.js";
+import { loadSeedConfig } from "../src/config.js";
 import { PrismaClient } from "../src/generated/prisma/client.js";
 
-config({ path: "../../.env", quiet: true });
-
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  "postgresql://incidentflow:incidentflow_dev@localhost:5432/incidentflow";
+const { DATABASE_URL: databaseUrl, PASSWORD_PEPPER: passwordPepper } =
+  loadSeedConfig();
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
@@ -100,11 +97,7 @@ async function main() {
     },
   });
 
-  const passwordHash = await hash(developmentOwner.password, {
-    memoryCost: 19_456,
-    timeCost: 2,
-    parallelism: 1,
-  });
+  const passwordHash = await hashPassword(developmentOwner.password, passwordPepper);
   const owner = await prisma.user.upsert({
     where: { email: developmentOwner.email },
     update: {

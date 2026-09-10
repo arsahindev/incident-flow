@@ -7,14 +7,15 @@ import type {
 } from "../generated/prisma/client.js";
 import {
   priorityLabels,
-  ResourceNotFoundError,
   statusLabels,
+  ResourceNotFoundError,
   type IncidentRepository,
 } from "./repository.js";
 import type {
   CreateIncidentInput,
   IncidentDetailRecord,
   IncidentListFilters,
+  IncidentMutationChange,
   IncidentPriority,
   IncidentStatus,
   IncidentSummaryRecord,
@@ -93,6 +94,7 @@ function toSummary(incident: PrismaIncidentSummary): IncidentSummaryRecord {
       status: affected.service.status.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["status"],
       isPrimary: affected.isPrimary,
     })),
+    version: incident.version,
     resolvedAt: incident.resolvedAt?.toISOString() ?? null,
     createdAt: incident.createdAt.toISOString(),
     updatedAt: incident.updatedAt.toISOString(),
@@ -260,7 +262,17 @@ export class PrismaIncidentRepository implements IncidentRepository {
 
       return incident.id;
     });
-    return this.getIncident(organizationSlug, incidentId);
+    const incident = await this.getIncident(organizationSlug, incidentId);
+    const changes: IncidentMutationChange[] = [
+      "created",
+      ...(input.teamId ? (["assignment"] as const) : []),
+      "affected_services",
+      "activity",
+    ];
+    return {
+      incident,
+      changes,
+    };
   }
 
   async updateIncident(
@@ -269,7 +281,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
     input: UpdateIncidentInput,
     actorUserId: string,
   ) {
-    await this.prisma.$transaction(async (transaction) => {
+    const changes = await this.prisma.$transaction(async (transaction) => {
       const existing = await transaction.incident.findFirst({
         where: { id: incidentId, organization: { slug: organizationSlug } },
         include: incidentSummaryInclude,
@@ -297,10 +309,12 @@ export class PrismaIncidentRepository implements IncidentRepository {
         fromValue: string | null;
         toValue: string | null;
       }> = [];
+      const mutationChanges: IncidentMutationChange[] = [];
 
       const currentStatus = fromPrismaStatus(existing.status);
       const statusChanged = input.status !== undefined && input.status !== currentStatus;
       if (statusChanged && input.status) {
+        mutationChanges.push("status");
         activity.push({
           organizationId: existing.organizationId,
           incidentId,
@@ -314,6 +328,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
 
       const requestedTeamId = input.teamId === undefined ? existing.teamId : input.teamId;
       if (input.teamId !== undefined && requestedTeamId !== existing.teamId) {
+        mutationChanges.push("assignment");
         activity.push({
           organizationId: existing.organizationId,
           incidentId,
@@ -345,6 +360,7 @@ export class PrismaIncidentRepository implements IncidentRepository {
           currentServiceIds.some((id) => !nextServiceIds.includes(id));
 
         if (servicesChanged) {
+          mutationChanges.push("affected_services");
           await transaction.incidentAffectedService.deleteMany({
             where: {
               organizationId: existing.organizationId,
@@ -373,26 +389,27 @@ export class PrismaIncidentRepository implements IncidentRepository {
         }
       }
 
-      await transaction.incident.update({
-        where: {
-          organizationId_id: {
-            organizationId: existing.organizationId,
-            id: incidentId,
-          },
-        },
-        data: {
-          status: input.status ? statusToPrisma[input.status] : undefined,
-          teamId: input.teamId,
-          resolvedAt:
-            statusChanged && input.status === "resolved"
-              ? new Date()
-              : statusChanged
-                ? null
-                : undefined,
-        },
-      });
-
       if (activity.length > 0) {
+        mutationChanges.push("activity");
+        await transaction.incident.update({
+          where: {
+            organizationId_id: {
+              organizationId: existing.organizationId,
+              id: incidentId,
+            },
+          },
+          data: {
+            status: input.status ? statusToPrisma[input.status] : undefined,
+            teamId: input.teamId,
+            resolvedAt:
+              statusChanged && input.status === "resolved"
+                ? new Date()
+                : statusChanged
+                  ? null
+                  : undefined,
+            version: { increment: 1 },
+          },
+        });
         await transaction.incidentActivity.createMany({ data: activity });
         await transaction.auditLog.create({
           data: {
@@ -405,9 +422,12 @@ export class PrismaIncidentRepository implements IncidentRepository {
           },
         });
       }
-
+      return mutationChanges;
     });
-    return this.getIncident(organizationSlug, incidentId);
+    return {
+      incident: await this.getIncident(organizationSlug, incidentId),
+      changes,
+    };
   }
 
   private async getAffectedServices(

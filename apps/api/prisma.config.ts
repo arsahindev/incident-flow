@@ -1,7 +1,6 @@
-import { config } from "dotenv";
 import { defineConfig } from "prisma/config";
 
-config({ path: "../../.env", quiet: true });
+import "./src/config.js";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -10,6 +9,8 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
+    // Keep generation install-safe. Commands that connect to PostgreSQL and the
+    // seed entry point validate DATABASE_URL before attempting database work.
     url: process.env["DATABASE_URL"],
   },
 });

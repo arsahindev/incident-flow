@@ -42,6 +42,7 @@ export type IncidentSummaryRecord = {
   priority: IncidentPriority;
   team: TeamRecord | null;
   affectedServices: AffectedServiceRecord[];
+  version: number;
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -84,4 +85,18 @@ export type IncidentListResult = {
     total: number;
     totalPages: number;
   };
+};
+
+export const incidentMutationChanges = [
+  "created",
+  "status",
+  "assignment",
+  "affected_services",
+  "activity",
+] as const;
+export type IncidentMutationChange = (typeof incidentMutationChanges)[number];
+
+export type IncidentMutationResult = {
+  incident: IncidentDetailRecord;
+  changes: IncidentMutationChange[];
 };

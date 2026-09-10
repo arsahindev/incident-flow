@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
 import { sendValidationError } from "../http/responses.js";
+import type { RealtimeSessionRevoker } from "../realtime/publisher.js";
 import { requirePermission } from "./permissions.js";
 import { extractSessionToken } from "./request.js";
 import {
@@ -17,17 +18,49 @@ import type { AuthService } from "./service.js";
 
 export async function registerAuthRoutes(
   app: FastifyInstance,
-  options: { authService: AuthService },
+  options: {
+    authService: AuthService;
+    realtimeSessionRevoker: RealtimeSessionRevoker;
+  },
 ) {
-  const { authService } = options;
+  const { authService, realtimeSessionRevoker } = options;
+
+  async function revokeRealtime(action: () => Promise<void>) {
+    try {
+      await action();
+    } catch (error) {
+      app.log.error({ err: error }, "Realtime session disconnection failed");
+    }
+  }
 
   app.post("/v1/auth/login", async (request, reply) => {
     const body = loginSchema.safeParse(request.body);
     if (!body.success) return sendValidationError(reply, body.error);
+
     const session = await authService.login({
       ...body.data,
       clientAddress: request.ip,
     });
+    return reply.header("cache-control", "no-store").send({ session });
+  });
+  app.post("/v1/auth/logout", async (request, reply) => {
+    await authService.logout(extractSessionToken(request));
+    await revokeRealtime(() =>
+      realtimeSessionRevoker.disconnectSession(request.auth.sessionId),
+    );
+    return reply.code(204).send();
+  });
+  app.post("/v1/auth/switch-organization", async (request, reply) => {
+    const body = switchOrganizationSchema.safeParse(request.body);
+    if (!body.success) return sendValidationError(reply, body.error);
+
+    const session = await authService.switchOrganization(
+      extractSessionToken(request),
+      body.data.organizationSlug,
+    );
+    await revokeRealtime(() =>
+      realtimeSessionRevoker.disconnectSession(request.auth.sessionId),
+    );
     return reply.header("cache-control", "no-store").send({ session });
   });
 
@@ -38,21 +71,6 @@ export async function registerAuthRoutes(
   app.get("/v1/auth/organizations", async (request) => ({
     organizations: await authService.listOrganizations(request.auth),
   }));
-
-  app.post("/v1/auth/logout", async (request, reply) => {
-    await authService.logout(extractSessionToken(request));
-    return reply.code(204).send();
-  });
-
-  app.post("/v1/auth/switch-organization", async (request, reply) => {
-    const body = switchOrganizationSchema.safeParse(request.body);
-    if (!body.success) return sendValidationError(reply, body.error);
-    const session = await authService.switchOrganization(
-      extractSessionToken(request),
-      body.data.organizationSlug,
-    );
-    return reply.header("cache-control", "no-store").send({ session });
-  });
 
   app.get("/v1/members", async (request) => {
     requirePermission(request.auth, "members.read");
@@ -89,9 +107,20 @@ export async function registerAuthRoutes(
     if (!params.success) return sendValidationError(reply, params.error);
     const body = updateMemberSchema.safeParse(request.body);
     if (!body.success) return sendValidationError(reply, body.error);
-    return {
-      member: await authService.updateMember(request.auth, params.data.userId, body.data),
-    };
+    const member = await authService.updateMember(
+      request.auth,
+      params.data.userId,
+      body.data,
+    );
+    if (body.data.status === "suspended") {
+      await revokeRealtime(() =>
+        realtimeSessionRevoker.disconnectUser(
+          request.auth.organizationId,
+          params.data.userId,
+        ),
+      );
+    }
+    return { member };
   });
 
   app.put("/v1/teams/:teamId/members/:userId", async (request, reply) => {
