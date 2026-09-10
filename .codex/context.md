@@ -1054,7 +1054,7 @@ Describe this milestone as ITIL-aligned, not certified.
 
 - Repository: `/Users/arsahin/Developer/incidentflow`.
 - Git is initialized. At the time of this handoff, the checked-out branch is `phase_3`; always inspect current branch/status before modifying files.
-- Phase 0 foundation, Phase 1 manual incident lifecycle, Phase 1.5 service catalog/affected services, and Phase 2 identity/authorization are merged to `main` at merge commit `59e8877`. Phase 3 is implemented as uncommitted local work on `phase_3`; do not commit or push without explicit user approval.
+- Phase 0 foundation, Phase 1 manual incident lifecycle, Phase 1.5 service catalog/affected services, and Phase 2 identity/authorization are merged to `main` at merge commit `59e8877`. Phase 3 is committed on `phase_3` and ready for the user to open a pull request; the user owns PR creation and merging to `main`.
 - Phase 1 baseline commit: `e43f355 feat: complete phase 1 manual incident lifecycle`.
 - pnpm workspace contains `apps/web`, `apps/api`, and the active `packages/contracts` package. The contracts package builds shared ESM/Zod identity and error contracts before dependent applications.
 - Next.js dashboard supports login/logout, invitation acceptance, member/role/access/team administration, permission-aware incident/service workflows, activity history, URL-backed filtering, pagination, and service catalog/detail/environment management.
@@ -1074,7 +1074,7 @@ Describe this milestone as ITIL-aligned, not certified.
 - Baseline GitHub Actions CI provisions PostgreSQL and runs frozen installation, migration deployment, lint, typecheck, unit tests, database integration tests, production build, and a high-severity production-dependency audit.
 - PostgreSQL runs through Docker Compose with persistent storage. Phase 3 was verified through warning-free lint and typecheck, shared-contract/application/client sequencing tests, focused loopback Socket.IO integration tests, the additive migration and current migration-status check, warning-free real-PostgreSQL identity/authorization/constraint/version tests, production builds, a high-severity production-dependency audit, and a local login-page smoke test.
 - The database contains development records created during verification, including an Order Routing API service, preview environment, linked incident, and a browser-verification viewer account; do not assume it is empty.
-- Phase 3 authenticated real-time incident coordination is implemented locally. Phase 3.5 account lifecycle and recovery is the planned next milestone, but it must not begin until the user finishes reviewing Phase 3, explicitly requests the Phase 3 commits, merges them to `main`, updates local `main`, and creates the `phase_3_5` branch. Do not begin Phase 4 before Phase 3.5 is completed and approved.
+- Phase 3 authenticated real-time incident coordination is implemented locally and committed for review. Phase 3.5 account lifecycle and recovery is the planned next milestone, but it must not begin until the user merges the Phase 3 pull request, updates local `main`, and creates the `phase_3_5` branch. Do not begin Phase 4 before Phase 3.5 is completed and approved.
 - Existing uncommitted user changes may be present. Always inspect and preserve them; never treat a dirty worktree as disposable.
 
 ### Local development
@@ -1113,8 +1113,8 @@ pnpm audit --prod --audit-level high
 
 1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
 2. Preserve the Phase 3 `RealtimePublisher`/Socket.IO boundary, server-derived rooms, strict-origin cookie handshake, best-effort signal semantics, and canonical-refetch/version guarantees.
-3. Remain on `phase_3` while the user reviews it. Run the full documented quality gate and a browser-level two-session realtime journey before any requested commit; keep discovered fixes within Phase 3, and do not commit or push until explicitly asked.
-4. After the user approves, make the requested progressive Phase 3 commits and stop for the user to open and merge the pull request. Do not switch or update branches on the user's behalf unless explicitly requested.
+3. Remain on `phase_3` while the user reviews the committed Phase 3 work. The non-database quality gate is passing; the real-PostgreSQL checks still need a running Docker daemon locally (and run in CI). Keep any requested fixes within Phase 3, and do not switch or update branches on the user's behalf unless explicitly requested.
+4. The user owns opening and merging the Phase 3 pull request. Do not begin Phase 3.5 until they confirm the merge, local `main` update, and `phase_3_5` branch creation.
 5. Begin Phase 3.5 only after the user confirms Phase 3 was merged, local `main` was updated, and the `phase_3_5` branch was created. Implement its account lifecycle/recovery scope incrementally before Phase 4.
 6. Continue migrating endpoint success schemas into `packages/contracts` when their APIs are actively changed; keep the stable coded error contract centralized.
 7. Keep the milestone local and runnable. Do not begin Phase 4 or jump to webhooks, AWS, queues, AI, Kafka, broad notifications, or on-call without explicit user approval.

@@ -146,6 +146,6 @@ incidentflow/
 
 ## Roadmap boundary
 
-Phase 3 is complete locally and under review. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
+Phase 3 is complete, committed, and ready for pull-request review. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
 
 Architecture decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md), [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md), and [ADR 0003: authenticated realtime update signals](docs/decisions/0003-authenticated-realtime-update-signals.md).
