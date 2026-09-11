@@ -31,12 +31,11 @@ else
   aws --region "$region" ecr get-login-password \
     | docker login --username AWS --password-stdin "${repository_uri%/*}"
 
-  docker buildx build --platform linux/amd64 --load \
+  docker buildx build --platform linux/amd64 --push \
     --build-arg API_URL=http://127.0.0.1:4000 \
     --build-arg NEXT_PUBLIC_REALTIME_URL=same-origin \
     --tag "${repository_uri}:${image_tag}" \
     .
-  docker push "${repository_uri}:${image_tag}"
 fi
 
 vpc_id=$(aws --region "$region" ec2 describe-vpcs \
