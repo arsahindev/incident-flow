@@ -164,21 +164,35 @@ Resources:
           ImageConfiguration:
             Port: "8080"
             RuntimeEnvironmentVariables:
-              API_URL: http://127.0.0.1:4000
-              NEXT_PUBLIC_REALTIME_URL: same-origin
-              WEB_ORIGIN: !Ref WebOrigin
-              DB_HOST: !GetAtt Database.Endpoint.Address
-              DB_PORT: !GetAtt Database.Endpoint.Port
-              DB_NAME: incidentflow
-              DB_USER: incidentflow
-              SEED_DEMO_DATA: "true"
-              SEED_OWNER_EMAIL: !Ref SeedOwnerEmail
-              SEED_ORGANIZATION_NAME: !Sub "IncidentFlow ${EnvironmentName}"
-              SEED_ORGANIZATION_SLUG: !Sub "incidentflow-${EnvironmentName}"
+              - Name: API_URL
+                Value: http://127.0.0.1:4000
+              - Name: NEXT_PUBLIC_REALTIME_URL
+                Value: same-origin
+              - Name: WEB_ORIGIN
+                Value: !Ref WebOrigin
+              - Name: DB_HOST
+                Value: !GetAtt Database.Endpoint.Address
+              - Name: DB_PORT
+                Value: !GetAtt Database.Endpoint.Port
+              - Name: DB_NAME
+                Value: incidentflow
+              - Name: DB_USER
+                Value: incidentflow
+              - Name: SEED_DEMO_DATA
+                Value: "true"
+              - Name: SEED_OWNER_EMAIL
+                Value: !Ref SeedOwnerEmail
+              - Name: SEED_ORGANIZATION_NAME
+                Value: !Sub "IncidentFlow ${EnvironmentName}"
+              - Name: SEED_ORGANIZATION_SLUG
+                Value: !Sub "incidentflow-${EnvironmentName}"
             RuntimeEnvironmentSecrets:
-              DB_PASSWORD: !Ref DatabasePasswordSecret
-              PASSWORD_PEPPER: !Ref PasswordPepperSecret
-              SEED_OWNER_PASSWORD: !Ref DemoOwnerPasswordSecret
+              - Name: DB_PASSWORD
+                Value: !Ref DatabasePasswordSecret
+              - Name: PASSWORD_PEPPER
+                Value: !Ref PasswordPepperSecret
+              - Name: SEED_OWNER_PASSWORD
+                Value: !Ref DemoOwnerPasswordSecret
 
 Outputs:
   ServiceUrl:

@@ -50,7 +50,8 @@ infra/scripts/deploy-app-runner-environment.sh prod
 ```
 
 The script validates/builds and locally loads the image for Linux/amd64, deploys the ECR stack,
-pushes the immutable environment/revision tag, and applies the environment
+pushes the immutable environment/revision tag when it does not already exist,
+and applies the environment
 stack twice. The first application creates the generated App Runner hostname;
 the second makes it Fastify's exact `WEB_ORIGIN`. It prints the web URL, API
 liveness/readiness URLs, and the Secret Manager ARN containing the generated

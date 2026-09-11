@@ -23,15 +23,21 @@ repository_uri=$(aws --region "$region" cloudformation describe-stacks \
   --query "Stacks[0].Outputs[?OutputKey=='RepositoryUri'].OutputValue" \
   --output text)
 
-aws --region "$region" ecr get-login-password \
-  | docker login --username AWS --password-stdin "${repository_uri%/*}"
+if aws --region "$region" ecr describe-images \
+  --repository-name "${repository_uri##*/}" \
+  --image-ids "imageTag=${image_tag}" >/dev/null 2>&1; then
+  echo "Reusing existing immutable image: ${repository_uri}:${image_tag}"
+else
+  aws --region "$region" ecr get-login-password \
+    | docker login --username AWS --password-stdin "${repository_uri%/*}"
 
-docker buildx build --platform linux/amd64 --load \
-  --build-arg API_URL=http://127.0.0.1:4000 \
-  --build-arg NEXT_PUBLIC_REALTIME_URL=same-origin \
-  --tag "${repository_uri}:${image_tag}" \
-  .
-docker push "${repository_uri}:${image_tag}"
+  docker buildx build --platform linux/amd64 --load \
+    --build-arg API_URL=http://127.0.0.1:4000 \
+    --build-arg NEXT_PUBLIC_REALTIME_URL=same-origin \
+    --tag "${repository_uri}:${image_tag}" \
+    .
+  docker push "${repository_uri}:${image_tag}"
+fi
 
 vpc_id=$(aws --region "$region" ec2 describe-vpcs \
   --filters Name=isDefault,Values=true \
