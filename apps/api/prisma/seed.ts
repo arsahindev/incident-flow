@@ -1,10 +1,13 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import { publicDemoAccount } from "@incidentflow/contracts";
 
 import { hashPassword } from "../src/auth/passwords.js";
+import { seedDemoAccount } from "../src/auth/seed-demo.js";
 import { loadSeedConfig } from "../src/config.js";
 import { PrismaClient } from "../src/generated/prisma/client.js";
+import { seedDemoIncidents } from "../src/seed-demo-incidents.js";
 
-const { DATABASE_URL: databaseUrl, PASSWORD_PEPPER: passwordPepper } =
+const { DATABASE_URL: databaseUrl, PASSWORD_PEPPER: passwordPepper, PUBLIC_DEMO_ENVIRONMENT: demoEnvironment } =
   loadSeedConfig();
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
@@ -150,6 +153,10 @@ async function main() {
     },
   });
 
+  if (demoEnvironment) {
+    await seedDemoAccount(prisma, publicDemoAccount(demoEnvironment), organization.id, team.id, passwordPepper);
+  }
+
   for (const [serviceIndex, serviceDefinition] of services.entries()) {
     const service = await prisma.service.upsert({
       where: {
@@ -158,14 +165,7 @@ async function main() {
           slug: serviceDefinition.slug,
         },
       },
-      update: {
-        name: serviceDefinition.name,
-        description: serviceDefinition.description,
-        type: serviceDefinition.type,
-        tier: serviceDefinition.tier,
-        ownerTeamId: team.id,
-        archivedAt: null,
-      },
+      update: {},
       create: {
         id: serviceDefinition.id,
         organizationId: organization.id,
@@ -187,11 +187,7 @@ async function main() {
             slug: environmentName,
           },
         },
-        update: {
-          name: environmentName[0]!.toUpperCase() + environmentName.slice(1),
-          kind: environmentName === "production" ? "PRODUCTION" : "STAGING",
-          status: "ACTIVE",
-        },
+        update: {},
         create: {
           id: `66666666-6666-4666-8666-${String(serviceIndex + 1).padStart(6, "0")}${String(environmentIndex + 1).padStart(6, "0")}`,
           organizationId: organization.id,
@@ -202,6 +198,9 @@ async function main() {
         },
       });
     }
+  }
+  if (demoEnvironment) {
+    await seedDemoIncidents(prisma, organization.id, team.id, publicDemoAccount(demoEnvironment).id);
   }
 }
 

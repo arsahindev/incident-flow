@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 import { config as loadEnvironmentFile } from "dotenv";
 import { z } from "zod";
+import { publicDemoEnvironmentSchema } from "@incidentflow/contracts";
 
 const defaultEnvironmentFilePath = resolve(import.meta.dirname, "../.env");
 
@@ -83,6 +84,7 @@ const databaseEnvironmentSchema = z.object({
 
 const seedEnvironmentSchema = databaseEnvironmentSchema.extend({
   PASSWORD_PEPPER: passwordPepperSchema,
+  PUBLIC_DEMO_ENVIRONMENT: publicDemoEnvironmentSchema.optional(),
 });
 
 const environmentSchema = z.object({

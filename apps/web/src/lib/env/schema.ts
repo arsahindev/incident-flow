@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { publicDemoEnvironmentSchema } from "@incidentflow/contracts";
 
 export type ConfigurationIssue = {
   variable: string;
@@ -69,6 +70,7 @@ export function httpOriginSchema(nodeEnvironment: string | undefined) {
 export function webServerEnvironmentSchema(nodeEnvironment: string | undefined) {
   return z.object({
     API_URL: httpOriginSchema(nodeEnvironment),
+    PUBLIC_DEMO_ENVIRONMENT: publicDemoEnvironmentSchema.optional(),
   });
 }
 
