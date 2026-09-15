@@ -17,7 +17,6 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          defaultValue="admin@incidentflow.local"
           className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5"
         />
       </label>

@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 import { config as loadEnvironmentFile } from "dotenv";
 import { z } from "zod";
+import { publicDemoEnvironmentSchema } from "@incidentflow/contracts";
 
 const defaultEnvironmentFilePath = resolve(import.meta.dirname, "../.env");
 
@@ -83,6 +84,7 @@ const databaseEnvironmentSchema = z.object({
 
 const seedEnvironmentSchema = databaseEnvironmentSchema.extend({
   PASSWORD_PEPPER: passwordPepperSchema,
+  PUBLIC_DEMO_ENVIRONMENT: publicDemoEnvironmentSchema.optional(),
 });
 
 const environmentSchema = z.object({
@@ -122,6 +124,16 @@ const environmentSchema = z.object({
     .min(1_000)
     .max(300_000)
     .default(60_000),
+  REALTIME_TRANSPORT: z.enum(["socketio", "ably"]).default("socketio"),
+  ABLY_API_KEY: z.string().regex(/^[\w-]+\.[\w-]+:[\w+/=-]+$/, "must contain a key name and secret").optional(),
+  VERCEL: z.string().optional(),
+}).superRefine((value, context) => {
+  if (value.REALTIME_TRANSPORT === "ably" && !value.ABLY_API_KEY) {
+    context.addIssue({ code: "custom", path: ["ABLY_API_KEY"], message: "is required for Ably" });
+  }
+  if (value.VERCEL === "1" && value.REALTIME_TRANSPORT !== "ably") {
+    context.addIssue({ code: "custom", path: ["REALTIME_TRANSPORT"], message: "must be ably on Vercel" });
+  }
 });
 
 function parseEnvironment<T>(schema: z.ZodType<T>, environment: NodeJS.ProcessEnv) {

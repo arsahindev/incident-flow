@@ -1,0 +1,16 @@
+.env
+.env.*
+apps/api/.env
+apps/api/.env.*
+apps/web/.env
+apps/web/.env.*
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+apps/web/.next
+apps/api/dist
+packages/contracts/dist
+.git
+.vscode
+coverage
+.deployment

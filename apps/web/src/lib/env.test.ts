@@ -8,6 +8,12 @@ import {
   webServerEnvironmentSchema,
 } from "./env/schema.js";
 
+test("web client accepts managed Ably without a public server key", () => {
+  assert.deepEqual(parseConfiguration("incidentflow-web", webClientEnvironmentSchema("production"), {
+    NEXT_PUBLIC_REALTIME_URL: "ably", ABLY_API_KEY: "must-not-be-exported",
+  }), { NEXT_PUBLIC_REALTIME_URL: "ably" });
+});
+
 test("web server environment requires an API URL", () => {
   assert.throws(
     () =>
@@ -66,4 +72,14 @@ test("web origins allow loopback HTTP and normalize a trailing slash", () => {
   );
 
   assert.equal(environment.NEXT_PUBLIC_REALTIME_URL, "http://localhost:4000");
+});
+
+test("web client configuration permits an explicit same-origin realtime endpoint", () => {
+  const environment = parseConfiguration(
+    "incidentflow-web",
+    webClientEnvironmentSchema("production"),
+    { NEXT_PUBLIC_REALTIME_URL: "same-origin" },
+  );
+
+  assert.equal(environment.NEXT_PUBLIC_REALTIME_URL, "same-origin");
 });

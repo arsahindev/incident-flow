@@ -1,0 +1,14 @@
+.git
+.codex
+.agents
+.deployment
+.vercel
+**/.env
+**/.env.*
+**/node_modules
+**/dist
+**/.next
+**/src/generated
+**/*.tsbuildinfo
+**/*.log
+infra

@@ -25,6 +25,8 @@ import {
 } from "./realtime/publisher.js";
 import type { ServiceRepository } from "./services/repository.js";
 import { registerServiceRoutes } from "./services/routes.js";
+import type { RealtimeTokenIssuer } from "./realtime/token-issuer.js";
+import { requirePermission } from "./auth/permissions.js";
 
 type BuildAppOptions = {
   incidentRepository?: IncidentRepository;
@@ -32,6 +34,7 @@ type BuildAppOptions = {
   authService?: AuthService;
   realtimePublisher?: RealtimePublisher;
   realtimeSessionRevoker?: RealtimeSessionRevoker;
+  realtimeTokenIssuer?: RealtimeTokenIssuer;
   testAuthContext?: AuthContext;
   logger?: boolean;
   webOrigin?: string;
@@ -42,7 +45,7 @@ export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({ logger: options.logger ?? true });
 
   if (
-    (options.incidentRepository || options.serviceRepository) &&
+    (options.incidentRepository || options.serviceRepository || options.realtimeTokenIssuer) &&
     !options.authService &&
     !options.testAuthContext
   ) {
@@ -115,6 +118,14 @@ export function buildApp(options: BuildAppOptions = {}) {
       authService: options.authService,
       realtimeSessionRevoker:
         options.realtimeSessionRevoker ?? new NoopRealtimeSessionRevoker(),
+    });
+  }
+
+  if (options.realtimeTokenIssuer) {
+    app.post("/v1/realtime/token", async (request) => {
+      requirePermission(request.auth, "incidents.read");
+      // Channel and client identity come exclusively from the authenticated session.
+      return options.realtimeTokenIssuer!.issueToken(request.auth);
     });
   }
 

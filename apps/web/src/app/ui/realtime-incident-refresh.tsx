@@ -38,9 +38,44 @@ export function RealtimeIncidentRefresh({
       }, 75);
     };
 
-    const socket = io(clientEnvironment.NEXT_PUBLIC_REALTIME_URL, {
+    const authenticationRequired = () => {
+      router.replace("/login");
+      router.refresh();
+    };
+    const receiveSignal = (payload: unknown) => {
+      const parsed = realtimeIncidentSignalSchema.safeParse(payload);
+      if (!parsed.success) return;
+      if (incidentId && parsed.data.incidentId !== incidentId) return;
+      if (acceptRealtimeIncidentSignal(latestVersions.current, parsed.data)) {
+        scheduleCanonicalRefetch();
+      }
+    };
+    if (clientEnvironment.NEXT_PUBLIC_REALTIME_URL === "ably") {
+      let disposed = false;
+      let close: (() => void) | undefined;
+      void import("@/lib/ably-realtime").then(({ connectAblyRealtime }) => {
+        if (disposed) return;
+        close = connectAblyRealtime({
+          status: setStatus, signal: receiveSignal,
+          refetch: scheduleCanonicalRefetch, authenticationRequired,
+        });
+      }).catch(() => { if (!disposed) setStatus("disconnected"); });
+      return () => {
+        disposed = true;
+        close?.();
+        if (refreshTimer) clearTimeout(refreshTimer);
+      };
+    }
+
+    const realtimeUrl =
+      clientEnvironment.NEXT_PUBLIC_REALTIME_URL === "same-origin"
+        ? window.location.origin
+        : clientEnvironment.NEXT_PUBLIC_REALTIME_URL;
+    const socket = io(realtimeUrl, {
       withCredentials: true,
       transports: ["websocket", "polling"],
+      // Some hosted proxies reject upgrades; retain authenticated polling.
+      tryAllTransports: true,
     });
 
     socket.on("connect", () => {
@@ -64,14 +99,7 @@ export function RealtimeIncidentRefresh({
       router.replace("/login");
       router.refresh();
     });
-    socket.on("realtime:incident", (payload) => {
-      const parsed = realtimeIncidentSignalSchema.safeParse(payload);
-      if (!parsed.success) return;
-      if (incidentId && parsed.data.incidentId !== incidentId) return;
-      if (acceptRealtimeIncidentSignal(latestVersions.current, parsed.data)) {
-        scheduleCanonicalRefetch();
-      }
-    });
+    socket.on("realtime:incident", receiveSignal);
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);

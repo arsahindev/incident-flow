@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { publicDemoEnvironmentSchema } from "@incidentflow/contracts";
 
 export type ConfigurationIssue = {
   variable: string;
@@ -19,15 +20,17 @@ export class ConfigurationError extends Error {
   }
 }
 
+const requiredString = z
+  .string({ error: "is required" })
+  .trim()
+  .min(1, "is required");
+
 function isLoopbackHostname(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
 export function httpOriginSchema(nodeEnvironment: string | undefined) {
-  return z
-    .string({ error: "is required" })
-    .trim()
-    .min(1, "is required")
+  return requiredString
     .pipe(z.url("must be a valid absolute URL"))
     .superRefine((value, context) => {
       const url = new URL(value);
@@ -67,12 +70,15 @@ export function httpOriginSchema(nodeEnvironment: string | undefined) {
 export function webServerEnvironmentSchema(nodeEnvironment: string | undefined) {
   return z.object({
     API_URL: httpOriginSchema(nodeEnvironment),
+    PUBLIC_DEMO_ENVIRONMENT: publicDemoEnvironmentSchema.optional(),
   });
 }
 
 export function webClientEnvironmentSchema(nodeEnvironment: string | undefined) {
   return z.object({
-    NEXT_PUBLIC_REALTIME_URL: httpOriginSchema(nodeEnvironment),
+    NEXT_PUBLIC_REALTIME_URL: requiredString.pipe(
+      z.union([z.literal("same-origin"), z.literal("ably"), httpOriginSchema(nodeEnvironment)]),
+    ),
   });
 }
 
