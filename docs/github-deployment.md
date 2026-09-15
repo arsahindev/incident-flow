@@ -1,77 +1,75 @@
-# Retired AWS main-to-dev deployment (historical)
+# Production deployment after merges to main
 
-> Deployment change, 2026-09-14: AWS dev/prod were deleted at the owner's request. Previous AWS URLs and administrator references below are historical. Local demo data remains intact. The AWS CI deployment job has been removed and deployment scripts are disabled. See the [free public-demo proposal](free-demo-deployment.md).
+The `CI` workflow in `.github/workflows/ci.yml` checks pull requests and branch
+pushes. A push to `main` (including a merged PR) deploys production only after
+`quality` succeeds. Feature branches and PRs never deploy. No hosted dev or AWS
+resources are needed. Keep Vercel's independent Git integration disconnected so
+it cannot bypass these checks.
 
+## One-time activation
 
-Status: retired. The AWS resources and OIDC trust were deleted. The current CI
-workflow runs quality checks only; production deployment uses Vercel CLI.
-The remaining sections describe the former design, not an active pipeline.
+The GitHub `production` environment exists and permits only the `main` branch.
+Before merging this automation, add these **environment secrets** under repository
+Settings → Environments → production:
 
-The `CI` workflow runs quality checks on pull requests and branch pushes. Its
-`deploy-dev` job runs only after successful quality checks for a push to `main`
-(including a merged pull request). It builds one immutable ECR image named
-`dev-<full-commit-sha>`, updates the existing dev CloudFormation stack, then checks
-health, readiness, the displayed public credentials, login, and Socket.IO fallback.
-The job records the exact commit, digest, and origin in its run summary.
+| Secret | Source |
+| --- | --- |
+| VERCEL_TOKEN | Vercel CI access token scoped to arscodings-projects |
+| PRODUCTION_DATABASE_URL | Direct DATABASE_URL from ignored .deployment/neon-production.env, not DATABASE_URL_POOLED |
 
-No deployment runs on a pull request or `codex/**` push. Dev deployments are
-serialized without cancelling an active stack operation. A superseded commit
-is skipped before creating its change set. Release changes are restricted to
-non-replacing updates of the App Runner Service. Other infrastructure changes
-require a separate reviewed CloudFormation operation. Existing networking and
-private credentials are preserved. The generated HTTPS origin is retained.
+Activation status: secret setup is pending; the first main-branch deployment has
+not run. Never commit these values. The token can be handed to the local setup
+process through ignored `.deployment/vercel-ci.env` as `VERCEL_TOKEN=...`.
+Rotate the GitHub secret when the token expires. Existing API secrets stay in
+Vercel; the workflow does not need the owner password, pepper or Ably key.
 
-## Bootstrap before merging
+Public team/project IDs are pinned in the workflow. Node22, pnpm11.20.0 and
+Vercel CLI59.17.0 are used. CLI source uploads build against each project's
+existing production settings and variables, using root directories `apps/api`
+and `apps/web`. `.vercelignore` excludes private local files.
 
-1. Inspect the repository's GitHub OIDC subject format and the AWS account's
-   existing OIDC provider/roles. Do not assume the subject format from the repo name.
-2. Through CloudFormation, create a repository/environment-scoped GitHub OIDC
-   deployment role and a separate dev CloudFormation execution role. Limit access
-   to the dev stack and ECR publication; do not grant the workflow owner-password
-   access or production stack control.
-3. Configure the GitHub `dev` environment to permit deployments only from `main`.
-   Set `DEV_AWS_ROLE_ARN` and `DEV_CFN_EXECUTION_ROLE_ARN` as environment variables.
-   OIDC supplies temporary credentials; AWS access keys are not required.
-4. Validate the role trust, execution policy, and workflow, then review the branch.
-   Commit/push/merge only when explicitly authorized by the repository owner.
-5. Merge to `main`, observe quality checks and dev deployment, and verify the
-   demo login and sample data before sharing the dev link.
+## Release sequence
 
-## Production release
+1. Quality job applies migrations to disposable PostgreSQL17, then runs lint,
+   typecheck, unit and PostgreSQL integration tests, build and dependency audit.
+2. Production jobs serialize without cancelling an active release. A job whose
+   SHA is already superseded on main skips before changing production.
+3. Apply committed Prisma migrations through the direct production connection.
+   Never seed or reset the production database in CI.
+4. Deploy the API and check public `/health` and `/ready` with bounded retries.
+5. Deploy the web app and check public `/login` with bounded retries.
+6. Record the commit and stable origins in the Actions summary. Vercel deployment
+   metadata also records `githubCommitSha`.
 
-The agreed strategy is a release tag selecting a tested commit from `main` and
-promoting its already-verified image digest to an immutable prod tag without
-rebuilding. The prod workflow and its separate authorization are still pending;
-pushing a Git tag currently does not deploy prod. Keep the dev/prod databases,
-secrets, and public origins separate. Database migrations must remain compatible
-with any image selected for rollback.
+A new main commit arriving during an active deployment waits for it to finish.
+The two project releases are sequential, not atomic. Keep API changes compatible
+with the previously deployed web app. There is no automatic database rollback.
 
-## Bootstrap checkpoint (2026-09-14)
+## Migration and failure rules
 
-The verified OIDC subject is
-`repo:arsahindev@80679047/incident-flow@1323148153:environment:dev`.
-The dev environment has exactly one deployment policy: branch `main`.
-Both role variables are configured and were read back successfully.
+Only backward-compatible migrations belong in this automatic path: add fields
+or tables first, deploy compatible readers/writers, backfill deliberately, and
+remove old schema only in a separately reviewed release after old consumers are
+gone. Review every generated migration. Destructive changes require a recovery
+plan and explicit manual coordination; CI passing on an empty database does not
+prove an upgrade preserves existing production data.
 
-`infra/cloudformation/github-dev-deployment.yaml` defines the shared GitHub OIDC
-provider and separate GitHub deployment/CloudFormation execution roles. The
-execution role can describe/update the existing dev service and pass its two
-existing runtime/ECR roles. The GitHub role can publish to the immutable ECR
-repository and manage dev change sets using that execution role. It cannot
-directly read secrets, delete images, or modify the prod stack.
+A migration/API failure stops before the web release. A failed health check may
+occur after the API alias has changed. A web failure can leave the newer API
+serving the previous web build. Inspect the failing Actions step and Vercel logs;
+fix forward with a reviewed PR, or redeploy a known-good compatible commit using
+the manual procedure in [the hosting guide](free-demo-deployment.md). Do not
+reverse database migrations or rerun seeds as an automatic rollback. Rerunning
+an existing main job works only while its SHA is still main's latest commit.
 
-AWS validate-template passed. Change set `bootstrap-20260914` on stack
-`incidentflow-github-dev` contains exactly three Add operations and no failed
-validation events. After explicit user approval, the change set was executed and the stack reached
-CREATE_COMPLETE. All three resources now exist. The deployed trust policy matches
-the verified subject exactly, and IAM Access Analyzer found no findings in either
-identity policy. The OIDC
-provider has Retain policies because it will be shared with later release roles.
+After the first merge, watch both jobs finish, then manually verify demo login,
+incident updates in two browsers and logout. HTTP smoke checks do not replace
+those authenticated checks. Deployment secrets and the first real workflow run
+are required before calling this pipeline operational.
 
-Configured GitHub environment variables:
+The old AWS main-to-dev design is retired. Its CloudFormation files and Git
+history remain engineering records; do not restore its roles, stacks or scripts.
 
-- `DEV_AWS_ROLE_ARN`: `arn:aws:iam::756649908672:role/incidentflow-github-dev-GitHubDevRole-CiPxVVgQdHO6`
-- `DEV_CFN_EXECUTION_ROLE_ARN`: `arn:aws:iam::756649908672:role/incidentflow-github-dev-DevCloudFormationRole-psxGGsz3Fvyc`
-
-These are public role identifiers, not credentials. An actual main-branch CI run
-is still required to verify OIDC assumption and the complete release path.
+References: [Vercel CLI options](https://vercel.com/docs/cli/global-options),
+[Vercel with GitHub Actions](https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel),
+[GitHub deployment environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).

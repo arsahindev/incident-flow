@@ -61,20 +61,23 @@ contracts. Project vercel.json files specify build commands, routing and regions
 
 ## Deploying a reviewed change
 
-GitHub CI runs quality checks only. A merge to main currently does not deploy.
-From the repository root, authenticate with vercel login if necessary, then select
+The new CI workflow deploys production after quality checks pass on main.
+See [activation, migration safety and recovery](github-deployment.md); production
+secrets and the first real run are still pending. For a deliberate manual recovery,
+from the repository root authenticate with vercel login, then select
 and deploy the appropriate existing project (API example):
 
 ```bash
-npx --yes vercel@latest link --yes --project incidentflow-api-prod --scope arscodings-projects
-npx --yes vercel@latest deploy --prod --yes --scope arscodings-projects
+npx --yes vercel@59.17.0 link --yes --project incidentflow-api-prod --scope arscodings-projects
+npx --yes vercel@59.17.0 deploy --prod --yes --scope arscodings-projects
 ```
 
 Use incidentflow-prod instead when deploying the web app. These commands upload
 the working tree; review local changes first. .vercelignore excludes credentials,
 scratch files and local build outputs. CLI linkage can create ignored .env.local
 and .vercel metadata. Never upload the private recovery file manually.
-Migrations and seed runs are separate deliberate steps, not per-request work.
+CI applies committed migrations before deployment and never seeds. Manual
+recovery requires checking schema compatibility before choosing an older commit.
 No migration is required for the transport/deployment changes on this branch.
 
 After deployment, check API /health and /ready, web /login, responder login,
@@ -86,5 +89,5 @@ AWS reports remain for engineering history; they are not the active runbook.
 ## Follow-on work
 
 This completes the Phase3 deployment exception. Phase3.5 account lifecycle and
-recovery follows after branch review/merge. Git-based automatic production
-rollouts can be a separate explicit change; no hosted dev is required.
+recovery follows after the automation follow-up is merged and verified. See
+[the next-phase handoff](phase-3-5-handoff.md); no hosted dev is required.

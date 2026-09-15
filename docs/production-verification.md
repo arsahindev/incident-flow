@@ -50,3 +50,16 @@ Normal unit discovery skips those9database cases by design. Dependency audit
 reported no known vulnerabilities. Shell/Node syntax and git diff checks passed.
 An initial sandboxed test run failed to bind local listeners; the permitted
 rerun passed. Private .env/recovery files remain ignored. No push or merge.
+
+## Automatic deployment follow-up - 2026-09-15
+
+Deployment PR #5 is now merged at 2a01b58. The separate automation branch adds
+main-push deployment after the quality job. Validation: actionlint1.7.7 passed,
+all deployment shell blocks passed bash syntax checks, workflow gate/concurrency
+assertions passed, and git diff --check passed. No application/schema changes
+were made, so the earlier application/database results above were not rerun.
+GitHub production environment was created and read back with exactly one branch
+policy, main. Its secret listing is empty: VERCEL_TOKEN and
+PRODUCTION_DATABASE_URL still need configuration. No new production deployment
+or end-to-end Actions run was performed. See github-deployment.md for activation
+and phase-3-5-handoff.md for the next milestone.

@@ -96,9 +96,12 @@ See [environment access](docs/environment-access.md), the
 [deployment guide](docs/free-demo-deployment.md), and
 [verified checks](docs/production-verification.md).
 
-GitHub CI runs quality checks only. Merging into main does not deploy;
-production updates currently use Vercel CLI source uploads. The AWS scripts
-exit immediately and the old CloudFormation runbook is historical.
+The CI workflow deploys API then web after a push/merge to `main` passes quality
+checks, applies migrations and verifies public endpoints. One-time production
+secret setup and the first real run are pending; follow the
+[activation and release runbook](docs/github-deployment.md). The AWS scripts
+remain disabled. See the [Phase 3.5 handoff](docs/phase-3-5-handoff.md) before
+starting the next milestone.
 
 ## Quality checks
 
@@ -158,6 +161,6 @@ incidentflow/
 
 ## Roadmap boundary
 
-Phase 3 and its portfolio deployment are complete. The deployment branch is ready for pull-request review. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
+Phase 3 and its portfolio deployment are complete. The deployment branch was merged in PR #5; automatic deployment is a separate follow-up. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
 
 Architecture decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md), [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md), and [ADR 0003: authenticated realtime update signals](docs/decisions/0003-authenticated-realtime-update-signals.md).
