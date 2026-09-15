@@ -16,6 +16,13 @@ const requiredEnvironment = {
   WEB_ORIGIN: "http://localhost:3000",
 };
 
+test("Ably requires its server key and Vercel rejects the Socket.IO transport", () => {
+  assert.equal(loadConfig(requiredEnvironment).REALTIME_TRANSPORT, "socketio");
+  assert.throws(() => loadConfig({ ...requiredEnvironment, REALTIME_TRANSPORT: "ably" }));
+  assert.throws(() => loadConfig({ ...requiredEnvironment, VERCEL: "1" }));
+  assert.equal(loadConfig({ ...requiredEnvironment, VERCEL: "1", REALTIME_TRANSPORT: "ably", ABLY_API_KEY: "test.key:test-only" }).REALTIME_TRANSPORT, "ably");
+});
+
 test("API configuration requires database URL and web origin", () => {
   assert.throws(
     () => loadConfig({}),

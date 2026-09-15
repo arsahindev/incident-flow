@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "pnpm --filter @incidentflow/contracts build && pnpm build",
+  "regions": ["fra1"]
+}

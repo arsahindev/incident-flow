@@ -6,6 +6,9 @@ import { sessionCookieName } from "./lib/auth-constants";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // This endpoint authenticates through the API and must return JSON 401, not login HTML.
+  if (pathname === "/api/realtime/token") return NextResponse.next();
+
   const hasSession = request.cookies.has(sessionCookieName);
   const isPublicPath =
     request.nextUrl.pathname === "/login" ||

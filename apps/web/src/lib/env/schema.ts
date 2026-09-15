@@ -77,7 +77,7 @@ export function webServerEnvironmentSchema(nodeEnvironment: string | undefined) 
 export function webClientEnvironmentSchema(nodeEnvironment: string | undefined) {
   return z.object({
     NEXT_PUBLIC_REALTIME_URL: requiredString.pipe(
-      z.union([z.literal("same-origin"), httpOriginSchema(nodeEnvironment)]),
+      z.union([z.literal("same-origin"), z.literal("ably"), httpOriginSchema(nodeEnvironment)]),
     ),
   });
 }

@@ -8,6 +8,12 @@ import {
   webServerEnvironmentSchema,
 } from "./env/schema.js";
 
+test("web client accepts managed Ably without a public server key", () => {
+  assert.deepEqual(parseConfiguration("incidentflow-web", webClientEnvironmentSchema("production"), {
+    NEXT_PUBLIC_REALTIME_URL: "ably", ABLY_API_KEY: "must-not-be-exported",
+  }), { NEXT_PUBLIC_REALTIME_URL: "ably" });
+});
+
 test("web server environment requires an API URL", () => {
   assert.throws(
     () =>
