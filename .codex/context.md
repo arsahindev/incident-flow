@@ -1,5 +1,21 @@
 # IncidentFlow — Project Context and Handoff
 
+## Current deployment status - 2026-09-15
+
+Production is live at https://incidentflow-prod.vercel.app, with Fastify at
+https://incidentflow-api-prod.vercel.app, Neon Free PostgreSQL and Ably Free.
+The owner requested a prod-only portfolio demo, local development and a $5/month
+ceiling, preferably free. All project AWS resources were deleted. CloudFormation
+and AWS deployment notes below are historical; do not recreate those resources.
+GitHub CI is quality-only. Production updates use Vercel CLI source upload.
+
+Demo login, data, cross-browser incident updates, API health/readiness and Ably
+logout revocation are verified. See docs/production-verification.md for exact
+checks, docs/free-demo-deployment.md for deployment, and docs/environment-access.md
+for public access and private credential storage. No private secrets belong in Git.
+The owner now explicitly authorized incremental commits for PR preparation;
+push, PR creation and merge remain user-owned. Do not begin Phase3.5 on this branch.
+
 ## Purpose of this document
 
 This document captures product, domain, architecture, reliability, and implementation decisions so a coding assistant can continue the project without rediscovering its intent. Treat it as the working design authority until a decision is deliberately changed. Keep it current when a milestone changes the product model or architecture; do not let the handoff drift behind the actual repository.
@@ -1050,7 +1066,7 @@ Describe this milestone as ITIL-aligned, not certified.
 
 ---
 
-## Current code state — 2026-08-27
+## Current code state — 2026-09-12
 
 - Repository: `/Users/arsahin/Developer/incidentflow`.
 - Git is initialized. Phase 3 is merged to `main` at `e660769`; always inspect the current branch/status before modifying files. Deployment enablement is developed on `codex/phase-3-deployment` and is not a replacement for the next approved product milestone, Phase 3.5.
@@ -1074,8 +1090,33 @@ Describe this milestone as ITIL-aligned, not certified.
 - Baseline GitHub Actions CI provisions PostgreSQL and runs frozen installation, migration deployment, lint, typecheck, unit tests, database integration tests, production build, and a high-severity production-dependency audit.
 - PostgreSQL runs through Docker Compose with persistent storage. Phase 3 was verified through warning-free lint and typecheck, shared-contract/application/client sequencing tests, focused loopback Socket.IO integration tests, the additive migration and current migration-status check, warning-free real-PostgreSQL identity/authorization/constraint/version tests, production builds, a high-severity production-dependency audit, and a local login-page smoke test.
 - The database contains development records created during verification, including an Order Routing API service, preview environment, linked incident, and a browser-verification viewer account; do not assume it is empty.
-- Phase 3 authenticated real-time incident coordination is implemented locally and committed for review. Phase 3.5 account lifecycle and recovery is the planned next milestone, but it must not begin until the user merges the Phase 3 pull request, updates local `main`, and creates the `phase_3_5` branch. Do not begin Phase 4 before Phase 3.5 is completed and approved.
+- Phase 3 authenticated real-time incident coordination is merged to `main`. Current authorized work is dev/prod deployment on `codex/phase-3-deployment`. Phase 3.5 requires a separate user instruction and branch. Do not begin Phase 4 before Phase 3.5 is completed and approved.
 - Existing uncommitted user changes may be present. Always inspect and preserve them; never treat a dirty worktree as disposable.
+
+### Historical AWS deployment recovery — 2026-09-11 (retired)
+
+- Inspected branch `codex/phase-3-deployment`, HEAD `2359442cb9ec`, history,
+  working tree, CloudFormation resources, ECR, and retained App Runner logs before edits.
+  The pre-existing untracked root `AGENTS.md` is preserved.
+- Initial dev image `dev-17d637566218` applied all five migrations, then seed
+  failed with Prisma P1011: `self-signed certificate in certificate chain`.
+  Startup exited before opening listeners. CloudFormation rolled back all live
+  resources; snapshot `incidentflow-dev-snapshot-database-py2ahb8shcfd` remains.
+- The container bundles public eu-central-1 RDS roots. node-postgres uses
+  `verify-full`/`sslrootcert`; Prisma Migrate uses `require`/`sslaccept=strict` with OpenSSL `SSL_CERT_FILE`.
+  Next.js runs with `apps/web` as its actual working directory, fixing both build
+  discovery and TypeScript config imports.
+- The disposable container regression verifies rejection of an untrusted CA and
+  wrong hostname, five migrations from empty PostgreSQL, seed, and HTTP 200 for
+  `/health`, `/ready`, and `/login` through Nginx.
+- Local lint/typecheck/build/audit pass; tests: contracts 4, API 34, web 12;
+  database integration 6/6, migration status current at five migrations.
+- Deployment tags include source content so an uncommitted fix cannot silently
+  reuse an old Git-only image. Promote the verified digest to an immutable prod
+  tag. CloudFormation remains the infrastructure authority; exact origins are
+  applied after generated hostnames exist and preserved during later updates.
+- Public dev verification found App Runner rejects WebSocket upgrades but authenticated Socket.IO polling works. The browser now enables `tryAllTransports`; CloudFormation caps active instances at one to preserve in-memory polling sessions and rooms. Deployment overlap can briefly disconnect clients; reconnect/refetch remains authoritative.
+- No Phase 3.5 or later product scope is started; no commit/push is authorized.
 
 ### Local development
 
@@ -1113,8 +1154,8 @@ pnpm audit --prod --audit-level high
 
 1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
 2. Preserve the Phase 3 `RealtimePublisher`/Socket.IO boundary, server-derived rooms, strict-origin cookie handshake, best-effort signal semantics, and canonical-refetch/version guarantees.
-3. Remain on `phase_3` while the user reviews the committed Phase 3 work. The full quality gate, including real-PostgreSQL integration tests and Prisma migration status, is passing. Keep any requested fixes within Phase 3, and do not switch or update branches on the user's behalf unless explicitly requested.
-4. The user owns opening and merging the Phase 3 pull request. Do not begin Phase 3.5 until they confirm the merge, local `main` update, and `phase_3_5` branch creation.
+3. Production deployment on `codex/phase-3-deployment` is complete. Incremental commits and final quality checks are complete; the owner will create the PR. Do not push or merge. Do not recreate AWS or hosted dev.
+4. The user owns review and merging of deployment changes. Do not begin Phase 3.5 during deployment work.
 5. Begin Phase 3.5 only after the user confirms Phase 3 was merged, local `main` was updated, and the `phase_3_5` branch was created. Implement its account lifecycle/recovery scope incrementally before Phase 4.
 6. Continue migrating endpoint success schemas into `packages/contracts` when their APIs are actively changed; keep the stable coded error contract centralized.
 7. Keep the milestone local and runnable. Do not begin Phase 4 or jump to webhooks, AWS, queues, AI, Kafka, broad notifications, or on-call without explicit user approval.
@@ -1129,3 +1170,47 @@ pnpm audit --prod --audit-level high
 - Be strict about correctness around signatures, retries, idempotency, secrets, and authorization.
 - Use honest portfolio-quality documentation. Do not claim "exactly once" delivery when the implementation is at-least-once plus idempotent consumers.
 - Preserve the architecture’s future seams: `RealtimePublisher`, AI-provider adapter, and an outbox transport that can change from polling to Debezium without changing domain logic.
+
+## Final portfolio deployment implementation
+
+- Shared publicDemoAccount(local/dev/prod) gives a reserved responder identity.
+  Seeds reject privileged identity collisions and preserve sample-content edits.
+  Local and prod have5services/6incidents; hosted dev was retired.
+- Production uses server-only API_URL and same-origin POST /api/realtime/token.
+  The route sends{} because Fastify rejects JSON content type with an empty body.
+- REALTIME_TRANSPORT=ably and server-only ABLY_API_KEY select managed realtime.
+  JWTs last60seconds and grant subscribe-only access to the authenticated tenant.
+  Revocation uses session clientId or organization/user revocationKey. Client
+  signals trigger canonical refetch and reject stale versions.
+- NEXT_PUBLIC_REALTIME_URL=ably selects the lazily loaded browser SDK. Local
+  Socket.IO remains supported. The production API entry imports only Ably,
+  avoiding the former Vercel Socket.IO packaging type diagnostics.
+- API api/index.ts reuses one initialized Fastify app and bounded pg.Pool(max5,
+  idle5s,connect10s), registered with attachDatabasePool. Runtime uses pooled Neon
+  URI with verified TLS; migrations use the direct URI. Five migrations applied.
+- Two Vercel projects constitute one prod environment: incidentflow-prod(web)
+  and incidentflow-api-prod(API), Node22, Frankfurt functions, production public.
+  Preview deployments disabled. Free quotas and cold starts remain limitations.
+- Private seed/connection values live in ignored .deployment/neon-production.env
+  and required runtime values in Vercel production-sensitive environment variables.
+  Owner password is not a runtime/browser variable. No commit of local.env files.
+- All AWS stacks/resources removed; deployment scripts exit64. Historical assets
+  are retained as engineering records and must not imply an active AWS service.
+- Latest verified live checks: /health,/ready,/login200; token200/no-store; real
+  Ably channel attachment; browser publish denied; logout reauthorization within
+ 15s and revoked session401; user confirmed immediate cross-browser updates.
+
+Next milestone after this PR is merged: Phase3.5 account lifecycle/recovery.
+Do not expand into Phase4 webhook ingestion during deployment closeout.
+
+## PR preparation validation
+
+Full workspace lint/typecheck/build passed. Unit suites:4contracts,41API,17web
+passed;9database cases are skipped in the normal suite and pass9/9 in the separate
+PostgreSQL integration run. Production dependency audit: no known vulnerabilities.
+The initial sandboxed unit run could not bind test listeners; the permitted rerun
+passed. Shell/Node syntax checks and diff-check passed. Secret/recovery files
+remain ignored; public demo passwords and the public RDS CA bundle are deliberate.
+Commits group repository guidance, demo seeds, Vercel/Ably hosting, AWS retirement
+and documentation. No push, PR creation, merge or production redeployment was
+performed during PR preparation. No product changes beyond the deployment scope.

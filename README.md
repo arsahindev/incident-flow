@@ -1,5 +1,8 @@
 # IncidentFlow
 
+> Deployment checkpoint, 2026-09-15: AWS dev/prod were deleted. Vercel and Neon projects exist; Neon contains the production demo data. Ably integration and the Vercel API function/pool setup are implemented and locally checked; production is deployed at https://incidentflow-prod.vercel.app with API https://incidentflow-api-prod.vercel.app. Health/readiness, realtime logout revocation, and two-browser incident updates are verified. See [final verification](docs/production-verification.md). Previous AWS URLs and administrator references below are historical. Local demo data remains intact; AWS deployment scripts are disabled. See the [free public-demo deployment](docs/free-demo-deployment.md).
+
+
 IncidentFlow is a multi-tenant incident intake, routing, notification, and response-coordination SaaS for backend teams. It is being built as a production-minded full-stack portfolio project, one working vertical slice at a time.
 
 ## Current milestone: Phase 3
@@ -30,11 +33,11 @@ Authenticated realtime incident coordination is working locally on top of the Ph
 - bounded inbound/outbound payloads, volatile backpressure handling, slow-client disconnection, session revalidation, and metrics seams;
 - focused socket integration tests for authentication, room authorization, tenant isolation, revocation, and backpressure.
 
-Account lifecycle and recovery is planned for Phase 3.5. Queues, webhook intake, AWS resources, broad incident notifications, and AI remain intentionally deferred to their roadmap phases.
+Account lifecycle and recovery is planned for Phase 3.5. Queues, webhook intake, broad incident notifications, and AI remain intentionally deferred. The prod-only Vercel/Neon/Ably portfolio deployment does not advance the product roadmap.
 
 ## Prerequisites
 
-- Node.js 22 or newer
+- Node.js 22
 - pnpm 11
 - Docker with Docker Compose
 
@@ -75,22 +78,27 @@ The repository includes focused `api.code-workspace`, `web.code-workspace`, and 
 
 Environment configuration is owned by the process that consumes it. The root `.env` configures only the Docker Compose PostgreSQL container, `apps/api/.env` configures Fastify and Prisma, and `apps/web/.env.local` configures Next.js. `DATABASE_URL`, `WEB_ORIGIN`, `PASSWORD_PEPPER`, `API_URL`, and `NEXT_PUBLIC_REALTIME_URL` are required and validated with field-specific startup/build errors; bounded listener/realtime tuning retains documented safe defaults. Generate a production pepper with `openssl rand -base64 32`, store it separately from PostgreSQL in the deployment secret store, and never log or commit it. The checked-in API example contains a local-development-only value. `NEXT_PUBLIC_REALTIME_URL` is public and frozen into the browser bundle during `next build`, so deployments must provide the same value during build and startup; changing only the startup value cannot rewrite the bundle. `API_URL` remains server-only runtime configuration. Configuration failures are logged without values and are never reclassified as API network failures.
 
-The realtime endpoint shares the API listener and accepts the `incidentflow_session` cookie only during the Socket.IO handshake. It requires the exact configured `WEB_ORIGIN`; browser code never receives the opaque session token. Local development works across ports because both applications use the `localhost` host. A production deployment must expose the socket endpoint on a host/path where the web session cookie is available, normally through a same-origin reverse proxy.
+Local Socket.IO shares the API listener and authenticates the `incidentflow_session` cookie against the exact `WEB_ORIGIN`. Hosted production uses Ably instead: the browser requests a short-lived, subscribe-only token from the same-origin Next.js endpoint, which authenticates against Fastify. The opaque session cookie stays on the web host; the Ably server key stays in the API's production environment.
 
 Realtime messages intentionally contain only an incident ID, event type, schema version, incident version, and timestamp. They are update signals, not canonical state or durable events: the dashboard refetches the normal authenticated API after a signal or reconnect.
 
-## Sharing a Phase 3 demo
+## Sharing the production demo
 
-The current milestone can be shared from one HTTPS origin with a private API
-process, PostgreSQL, and a WebSocket-capable reverse proxy. A versioned
-CloudFormation/App Runner demo path creates separate `dev` and `prod`
-environments with an isolated RDS database and Secrets Manager values; the
-same origin carries the dashboard, API health endpoints, and Socket.IO
-handshake. See the
-[Phase 3 demo deployment runbook](docs/phase-3-demo-deployment.md) for the
-required topology, AWS prerequisites/cost lifecycle, secrets, migration
-command, start commands, proxy example, and known Phase 3 limits. It
-intentionally does not represent the later Phase 10 production-platform scope.
+- [Web app](https://incidentflow-prod.vercel.app)
+- [API health](https://incidentflow-api-prod.vercel.app/health)
+- [Database readiness](https://incidentflow-api-prod.vercel.app/ready)
+- Public responder: `demo+prod@incidentflow.demo` / `IncidentFlow-Demo-prod-2026!`
+
+Production runs on Vercel Hobby, Neon Free and Ably Free. Local Docker remains
+available; hosted dev and all project AWS resources were retired for cost.
+Private owner credentials are kept outside Git and never shown on the login page.
+See [environment access](docs/environment-access.md), the
+[deployment guide](docs/free-demo-deployment.md), and
+[verified checks](docs/production-verification.md).
+
+GitHub CI runs quality checks only. Merging into main does not deploy;
+production updates currently use Vercel CLI source uploads. The AWS scripts
+exit immediately and the old CloudFormation runbook is historical.
 
 ## Quality checks
 
@@ -150,6 +158,6 @@ incidentflow/
 
 ## Roadmap boundary
 
-Phase 3 is complete, committed, and ready for pull-request review. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
+Phase 3 and its portfolio deployment are complete. The deployment branch is ready for pull-request review. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
 
 Architecture decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md), [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md), and [ADR 0003: authenticated realtime update signals](docs/decisions/0003-authenticated-realtime-update-signals.md).
