@@ -6,12 +6,14 @@ node_modules/
 .next/
 dist/
 coverage/
+.deployment/
+.vercel/
 *.tsbuildinfo
 
 # Environment files (the example is safe to commit)
 .env
 .env.local
-.env.*.local
+.env.*
 !.env.example
 
 # Tooling and operating-system files

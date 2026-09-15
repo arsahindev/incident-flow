@@ -13,3 +13,4 @@ packages/contracts/dist
 .git
 .vscode
 coverage
+.deployment
