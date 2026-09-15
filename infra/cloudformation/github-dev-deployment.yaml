@@ -1,0 +1,149 @@
+# Historical AWS topology, retired for cost. Do not deploy; see docs/free-demo-deployment.md.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: GitHub OIDC and scoped roles for releases to the existing IncidentFlow dev environment.
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@2
+
+Parameters:
+  GitHubSubject:
+    Type: String
+    Description: Exact verified repository OIDC subject including the dev environment.
+  DevServiceArn:
+    Type: String
+  DevScalingArn:
+    Type: String
+  DevVpcConnectorArn:
+    Type: String
+  DevEcrAccessRoleArn:
+    Type: String
+  DevInstanceRoleArn:
+    Type: String
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Exchange GitHub job identity for temporary AWS credentials.
+        must:
+          - Reuse this account-wide provider for later release roles; do not create duplicates.
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  DevCloudFormationRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: CloudFormation can update only the existing dev App Runner service.
+        must:
+          - Infrastructure creation or replacement requires a separate administrator operation.
+          - Pass only the two existing dev App Runner roles; never prod roles.
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: UpdateExistingDevService
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: apprunner:DescribeService
+                Resource: !Ref DevServiceArn
+              - Effect: Allow
+                Action: apprunner:UpdateService
+                Resource:
+                  - !Ref DevServiceArn
+                  - !Ref DevScalingArn
+                  - !Ref DevVpcConnectorArn
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !Ref DevEcrAccessRoleArn
+                  - !Ref DevInstanceRoleArn
+
+  GitHubDevRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Permit verified repository dev jobs to publish images and release through CloudFormation.
+        must:
+          - Exact aud and sub trust; GitHub dev environment must allow only main.
+          - No direct App Runner updates, secret reads, image deletion, or prod stack changes.
+    Properties:
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Ref GitHubSubject
+      Policies:
+        - PolicyName: PublishImageAndReleaseDev
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:DescribeImages
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/incidentflow"
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/incidentflow-dev/*"
+                  - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/incidentflow-container-registry/*"
+              - Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource: !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/incidentflow-dev/*"
+                Condition:
+                  StringEquals:
+                    cloudformation:RoleArn: !GetAtt DevCloudFormationRole.Arn
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:TagResource
+                  - cloudformation:UntagResource
+                Resource: !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/incidentflow-dev/*"
+              - Effect: Allow
+                Action: cloudformation:DescribeEvents
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/incidentflow-dev/*"
+                  - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:changeSet/main-*/*"
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt DevCloudFormationRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: cloudformation.amazonaws.com
+
+Outputs:
+  GitHubDevRoleArn:
+    Value: !GetAtt GitHubDevRole.Arn
+  DevCloudFormationRoleArn:
+    Value: !GetAtt DevCloudFormationRole.Arn
+  OidcProviderArn:
+    Value: !Ref GitHubOidcProvider

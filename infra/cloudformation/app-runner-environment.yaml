@@ -1,5 +1,9 @@
+# Historical AWS topology, retired for cost. Do not deploy; see docs/free-demo-deployment.md.
 AWSTemplateFormatVersion: "2010-09-09"
 Description: One isolated IncidentFlow App Runner and PostgreSQL environment.
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@2
 
 Parameters:
   EnvironmentName:
@@ -135,10 +139,30 @@ Resources:
       Subnets: !Ref SubnetIds
       SecurityGroups: [!Ref AppRunnerSecurityGroup]
 
+  SingleInstanceScaling:
+    Type: AWS::AppRunner::AutoScalingConfiguration
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Phase 3 Socket.IO rooms and polling sessions are held in one process.
+        must:
+          - Keep one active instance until distributed realtime and session routing exist.
+    Properties:
+      AutoScalingConfigurationName: !Sub "incidentflow-${EnvironmentName}-single"
+      MinSize: 1
+      MaxSize: 1
+      MaxConcurrency: 100
+
   Service:
     Type: AWS::AppRunner::Service
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: One HTTPS origin preserves the browser session cookie for web and Socket.IO polling.
+        must:
+          - Preserve the exact WEB_ORIGIN and single-instance scaling configuration.
+          - Public demo credentials belong only to the seeded responder; owner credentials stay private.
     Properties:
       ServiceName: !Sub "incidentflow-${EnvironmentName}"
+      AutoScalingConfigurationArn: !GetAtt SingleInstanceScaling.AutoScalingConfigurationArn
       HealthCheckConfiguration:
         Protocol: HTTP
         Path: /ready
@@ -164,6 +188,8 @@ Resources:
           ImageConfiguration:
             Port: "8080"
             RuntimeEnvironmentVariables:
+              - Name: PUBLIC_DEMO_ENVIRONMENT
+                Value: !Ref EnvironmentName
               - Name: API_URL
                 Value: http://127.0.0.1:4000
               - Name: NEXT_PUBLIC_REALTIME_URL

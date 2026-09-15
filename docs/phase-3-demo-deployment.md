@@ -1,5 +1,13 @@
 # Phase 3 shareable-demo deployment
 
+> Deployment change, 2026-09-14: AWS dev/prod were deleted at the owner's request. Previous AWS URLs and administrator references below are historical. Local demo data remains intact. The AWS CI deployment job has been removed and deployment scripts are disabled. See the [free public-demo proposal](free-demo-deployment.md).
+
+
+Public responder account support is prepared for the next deployment. See
+[environment access](environment-access.md) for public demo credentials, private
+administrator references, and the `PUBLIC_DEMO_ENVIRONMENT` opt-in. Do not publish
+the private owner secret as the demo login.
+
 This runbook deploys the current Phase 3 application as a small, single-origin
 HTTPS demo. The repository provides a CloudFormation/App Runner path for
 isolated `dev` and `prod` environments, plus the manual-host topology for
@@ -26,13 +34,19 @@ The versioned AWS demo path is intentionally small and costs money while it is
 running. For each environment it creates:
 
 - one private ECR repository shared by the environments;
-- one immutable, Linux/amd64 image tag for the checked-out Git revision;
+- one immutable, Linux/amd64 image tag for the Git revision and source-content hash;
 - an App Runner service running Nginx, Next.js, and Fastify in one container;
 - a private, single-AZ PostgreSQL RDS instance with seven-day backups;
 - Secrets Manager values for the database password, password pepper, and a
   generated demo-owner password; and
 - least-privilege App Runner roles, a VPC connector, and security groups that
   permit database access only from the service.
+
+App Runner rejects WebSocket upgrades in the verified deployment. The browser
+uses automatic Socket.IO transport fallback to authenticated HTTP polling.
+CloudFormation caps each environment at one active instance because Phase 3
+rooms and polling sessions are in memory. Brief reconnects during deployments
+are expected; shared realtime fan-out remains deferred.
 
 The container exposes the dashboard at its App Runner HTTPS URL and the API at
 the same host's `/health` and `/ready` paths. Keeping Socket.IO at
@@ -44,24 +58,66 @@ IAM, and Secrets Manager resources. The deployment script defaults to
 `eu-central-1` and discovers that region's default VPC and subnets.
 
 ```bash
-# From the intended committed revision; deploy each isolated environment.
+# From the intended source state; credentials stay in the named local profile.
+export AWS_PROFILE=incidentflow
+export AWS_REGION=eu-central-1
 infra/scripts/deploy-app-runner-environment.sh dev
 infra/scripts/deploy-app-runner-environment.sh prod
 ```
 
 The script validates/builds and directly pushes a Linux/amd64 image to ECR,
-reusing the immutable environment/revision tag when it already exists,
-and applies the environment
-stack twice. The first application creates the generated App Runner hostname;
-the second makes it Fastify's exact `WEB_ORIGIN`. It prints the web URL, API
+reusing the immutable environment/revision/content tag when it already exists,
+and applies the environment stack twice. The initial application creates the
+generated App Runner hostname; the second sets it as Fastify's exact
+`WEB_ORIGIN`. Subsequent deployments preserve the existing origin. It prints the web URL, API
 liveness/readiness URLs, and the Secret Manager ARN containing the generated
-demo password. Retrieve the password only through the AWS console or CLI with
-appropriate permission; do not put it in source control or logs.
+demo password. For operator checks, use `asm-exec` with a
+`{{resolve:secretsmanager:secret-arn:SecretString}}` reference. Do not retrieve
+plaintext with secret-value CLI commands or print credentials in logs.
+
+Before executing a release, create and inspect the CloudFormation change set
+(`--no-execute-changeset` with the CLI deploy command), then execute that reviewed
+change set. Check `describe-events` for validation failures and wait for terminal
+stack success. For prod, promote the verified dev image digest under a new
+immutable `prod-...` tag, rather than rebuilding a different artifact.
 
 CloudFormation retains an RDS snapshot if an environment stack is deleted. To
 stop costs, explicitly delete both environment stacks when the demo is no
 longer needed, then decide whether to retain or delete their snapshots and
 secrets. The image repository intentionally retains recent images for rollback.
+
+## Startup verification and recovery
+
+The image contains the public AWS eu-central-1 RDS CA bundle under
+`infra/docker/certs/`. Node-postgres seed/API connections use `verify-full`
+with `sslrootcert`; Prisma Migrate uses `require` and `sslaccept=strict`, with `SSL_CERT_FILE`
+loading the full bundle into OpenSSL. These clients have different option names. Certificate
+validation remains enabled. Next.js must start with the `apps/web` directory.
+
+The initial dev logs recorded successful migration of all five schema versions,
+then seed failure P1011 (`self-signed certificate in certificate chain`). This
+was the verified reason no health listener started. The old Next.js invocation
+also failed locally because it looked for `.next` in the repository root.
+
+Run the full disposable regression against the built image before release:
+
+```bash
+infra/scripts/test-deployment-container.sh incidentflow:deployment-tls-fix
+```
+
+It rejects an untrusted CA and incorrect database hostname, applies all migrations
+from empty PostgreSQL over verified TLS, seeds, and checks `/health`, `/ready`,
+and `/login` through Nginx. It deletes only its own temporary containers/network.
+
+For `ROLLBACK_COMPLETE`, inspect resources before recovery. The initial failed
+stack had already deleted every live resource; its available RDS snapshot was
+retained. Removing that empty stack record permits recreation. Never delete a
+live environment or retained snapshot as an automatic retry.
+
+For rollback, select a previously verified immutable digest and prepare a
+CloudFormation update preserving the generated origin. Schema changes require
+separate review; `migrate deploy` does not reverse migrations. This release
+changes no schema. Retain snapshots and credentials needed for recovery.
 
 ## Manual-host deployment
 
@@ -166,7 +222,6 @@ browser's same-origin cookie and Caddy handles the WebSocket upgrade.
 ## Deliberately deferred hardening
 
 This runbook is suitable for sharing the working Phase 3 milestone with an
-employer, not for claiming a production SaaS deployment. Phase 10 remains the
-place for container images, immutable releases, cloud infrastructure, secret
-management integration, deployment automation, monitoring/alerts, backup and
-restore exercises, and rollback procedures.
+employer, not for claiming a production SaaS deployment. The bounded image, infrastructure, runtime secret injection, and manual release
+path are implemented here. Phase 10 still owns automated deployment,
+monitoring/alerts, distributed realtime, and backup/restore exercises.

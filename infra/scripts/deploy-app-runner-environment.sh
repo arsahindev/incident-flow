@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Retired on 2026-09-14: the portfolio budget forbids this paid topology.
+echo "AWS deployment retired. See docs/free-demo-deployment.md." >&2
+exit 64
+
 if [[ $# -ne 1 || ("$1" != "dev" && "$1" != "prod") ]]; then
   echo "Usage: $0 <dev|prod>" >&2
   exit 64
@@ -11,7 +15,10 @@ region=${AWS_REGION:-eu-central-1}
 repository_stack=incidentflow-container-registry
 environment_stack="incidentflow-${environment_name}"
 git_revision=$(git rev-parse --short=12 HEAD)
-image_tag="${environment_name}-${git_revision}"
+# A Git-only tag can silently reuse an old image for an uncommitted fix.
+source_hash=$(git ls-files --cached --others --exclude-standard -z \
+  | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-12)
+image_tag="${environment_name}-${git_revision}-${source_hash}"
 
 aws --region "$region" cloudformation deploy \
   --stack-name "$repository_stack" \
@@ -76,7 +83,11 @@ deploy_environment() {
 # The first deployment creates the App Runner hostname. The explicit
 # `same-origin` browser configuration avoids rebuilding after that URL is known;
 # only the API's strict trusted-origin value is updated in the second pass.
-deploy_environment https://placeholder.invalid
+existing_origin=$(aws --region "$region" cloudformation describe-stacks \
+  --stack-name "$environment_stack" \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceUrl'].OutputValue" \
+  --output text 2>/dev/null || true)
+deploy_environment "${existing_origin:-https://placeholder.invalid}"
 service_url=$(aws --region "$region" cloudformation describe-stacks \
   --stack-name "$environment_stack" \
   --query "Stacks[0].Outputs[?OutputKey=='ServiceUrl'].OutputValue" \
