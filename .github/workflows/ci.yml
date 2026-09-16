@@ -38,6 +38,7 @@ jobs:
         with:
           version: 11.20.0
           runtime: node@v24
+          install: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @incidentflow/api exec prisma migrate deploy
       - run: pnpm lint
@@ -61,7 +62,7 @@ jobs:
     env:
       VERCEL_ORG_ID: team_GxXU8fOOaZn0RH4E5YgeMUII
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Skip superseded commits before changing production
         id: current
         shell: bash
@@ -81,15 +82,12 @@ jobs:
         run: |
           test -n "$VERCEL_TOKEN" || { echo 'Missing production VERCEL_TOKEN'; exit 1; }
           test -n "$DATABASE_URL" || { echo 'Missing production PRODUCTION_DATABASE_URL'; exit 1; }
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/setup@v2
         if: steps.current.outputs.deploy == 'true'
         with:
           version: 11.20.0
-      - uses: actions/setup-node@v4
-        if: steps.current.outputs.deploy == 'true'
-        with:
-          node-version: 24
-          cache: pnpm
+          runtime: node@v24
+          install: false
       - name: Install locked workspace dependencies
         if: steps.current.outputs.deploy == 'true'
         run: pnpm install --frozen-lockfile
