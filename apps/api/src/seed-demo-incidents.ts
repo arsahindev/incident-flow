@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "./generated/prisma/client.js";
 
-const examples = [
+const exampleIncidents = [
   {
     title: "Checkout requests timing out",
     description:
@@ -65,20 +65,24 @@ export async function seedDemoIncidents(
   actorUserId: string,
 ) {
   const services = await prisma.service.findMany({ where: { organizationId } });
-  for (const example of examples) {
-    const serviceIds = example.services.map((slug) => {
+
+  for (const exampleIncident of exampleIncidents) {
+    const serviceIds = exampleIncident.services.map((slug) => {
       const service = services.find((candidate) => candidate.slug === slug);
       if (!service)
         throw new Error(`Demo incident seed requires service ${slug}`);
       return service.id;
     });
+
     const digest = createHash("sha256")
-      .update(`${organizationId}:demo:${example.title}`)
+      .update(`${organizationId}:demo:${exampleIncident.title}`)
       .digest("hex");
     const id = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-8${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
-    const createdAt = new Date(Date.now() - example.hoursAgo * 3_600_000);
+    const createdAt = new Date(
+      Date.now() - exampleIncident.hoursAgo * 3_600_000,
+    );
     const changedAt = new Date(createdAt.getTime() + 3_600_000);
-    const transitioned = example.status !== "OPEN";
+    const transitioned = exampleIncident.status !== "OPEN";
     // Stable organization-scoped identities make reruns safe. Existing visitor
     // edits, versions, and activity are intentionally left untouched.
     await prisma.incident.upsert({
@@ -88,14 +92,14 @@ export async function seedDemoIncidents(
         id,
         organizationId,
         teamId,
-        title: example.title,
-        description: example.description,
-        priority: example.priority,
-        status: example.status,
+        title: exampleIncident.title,
+        description: exampleIncident.description,
+        priority: exampleIncident.priority,
+        status: exampleIncident.status,
         version: transitioned ? 2 : 1,
         createdAt,
         updatedAt: transitioned ? changedAt : createdAt,
-        resolvedAt: example.status === "RESOLVED" ? changedAt : null,
+        resolvedAt: exampleIncident.status === "RESOLVED" ? changedAt : null,
         affectedServices: {
           create: serviceIds.map((serviceId, index) => ({
             serviceId,
@@ -117,8 +121,8 @@ export async function seedDemoIncidents(
                     actorUserId,
                     type: "STATUS_CHANGED" as const,
                     fromValue: "OPEN",
-                    toValue: example.status,
-                    message: `Demo response moved the incident to ${example.status.toLowerCase()}.`,
+                    toValue: exampleIncident.status,
+                    message: `Demo response moved the incident to ${exampleIncident.status.toLowerCase()}.`,
                     createdAt: changedAt,
                   },
                 ]

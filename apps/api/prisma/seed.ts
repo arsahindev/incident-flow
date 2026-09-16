@@ -1,11 +1,12 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+
 import { publicDemoAccount } from "@incidentflow/contracts";
+import { PrismaClient } from "../src/generated/prisma/client.js";
 
 import { hashPassword } from "../src/auth/passwords.js";
 import { seedDemoAccount } from "../src/auth/seed-demo.js";
-import { loadSeedConfig } from "../src/config.js";
-import { PrismaClient } from "../src/generated/prisma/client.js";
 import { seedDemoIncidents } from "../src/seed-demo-incidents.js";
+import { loadSeedConfig } from "../src/config.js";
 
 const {
   DATABASE_URL: databaseUrl,
