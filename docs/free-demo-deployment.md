@@ -1,9 +1,13 @@
 # Free production portfolio deployment
 
-Status: deployed and verified. The current scope is one production portfolio
-demo plus local Docker development. The owner targets $0, with a $5/month ceiling.
-AWS resources and hosted dev were deleted because provisioned idle costs did not
-fit that budget. Do not re-enable the retired AWS deployment scripts.
+Read when configuring hosting or performing an authorized manual recovery.
+This is the authoritative hosting configuration/procedure, based on the recorded
+2026-09-15 deployment and 2026-09-16 runtime alignment. It is not a fresh cloud
+inspection. Current external settings, quotas and live health need verification
+when undertaking deployment work; no services were contacted during the docs cleanup.
+The scope is one production demo plus local Docker, targeting $0 with a $5/month
+ceiling. AWS/hosted dev retirement was recorded because idle costs exceeded the
+budget. Do not re-enable the retired AWS deployment scripts.
 
 ## Current topology
 
@@ -14,31 +18,23 @@ fit that budget. Do not re-enable the retired AWS deployment scripts.
 | PostgreSQL on Neon Free | incidentflow-prod | Server-only pooled connection |
 | Realtime on Ably Free | IncidentFlow | Scoped token-authenticated channels |
 
-Both app projects target Node24 and Frankfurt functions. They form one prod
-environment, not separate dev/prod deployments. Preview deployments are disabled.
+Both app projects target Node 24 and Frankfurt functions. They form one prod
+environment, not separate dev/prod deployments. Preview deployments were recorded
+as disabled; recheck settings during authorized deployment work.
 Production origins are public; application data still requires authentication.
 Free-tier quotas and cold starts apply. Do not enable paid upgrades automatically.
 See [Vercel Hobby](https://vercel.com/docs/plans/hobby),
 [Neon pricing](https://neon.com/pricing), and
 [Ably Free](https://ably.com/docs/platform/pricing/free) for current limits.
 
-## Authentication and realtime
+## Runtime and account references
 
-The browser keeps its HttpOnly session cookie on the web host. Next.js forwards
-Session authorization to Fastify through server-only API_URL. The same-origin
-POST /api/realtime/token sends an empty JSON object and receives a no-store,
-60-second JWT restricted to subscribing to its authenticated organization.
-The Ably server key is never sent to the browser. Logout and suspension revoke
-by session or organization/user; failed revocation is bounded by token expiry.
-Signals contain identifiers/versions only and trigger canonical API refetch.
-The client refetches after connection gaps and rejects stale versions.
-Local development retains the existing Socket.IO transport and cookie handshake.
-
-The API function reuses its initialized app and Prisma pg.Pool(max5,idle5s,
-connect10s). attachDatabasePool manages idle connections across Vercel suspension.
-Runtime uses the pooled Neon URI with verified TLS; migrations use the direct
-URI. Five existing migrations and the public/private account seeds were applied.
-See [environment access](environment-access.md) for credentials and seed behavior.
+[Architecture](architecture.md#runtime-configuration-and-hosting-adapters) owns the
+BFF/token bridge, realtime revocation and API pool design; read it when changing
+runtime behavior. [Environment access](environment-access.md) owns demo accounts,
+seed behavior and private recovery locations; read it when managing access.
+[Production verification](production-verification.md) records the five applied
+migrations, seed/deployment evidence and known limits at the time of verification.
 
 ## Production configuration
 
@@ -61,9 +57,9 @@ contracts. Project vercel.json files specify build commands, routing and regions
 
 ## Deploying a reviewed change
 
-The new CI workflow deploys production after quality checks pass on main.
-See [activation, migration safety and recovery](github-deployment.md); production
-secrets and the first real run are still pending. For a deliberate manual recovery,
+The repository workflow defines production deployment after quality checks pass
+on main. Read [activation, migration safety and recovery](github-deployment.md)
+for release operations and the last recorded activation status. For a deliberate manual recovery,
 from the repository root authenticate with vercel login, then select
 and deploy the appropriate existing project (API example):
 
@@ -78,16 +74,18 @@ scratch files and local build outputs. CLI linkage can create ignored .env.local
 and .vercel metadata. Never upload the private recovery file manually.
 CI applies committed migrations before deployment and never seeds. Manual
 recovery requires checking schema compatibility before choosing an older commit.
-No migration is required for the transport/deployment changes on this branch.
+The original transport/deployment change required no new migration; assess the
+actual reviewed change before each release.
 
 After deployment, check API /health and /ready, web /login, responder login,
 incident updates between two browser sessions, and logout revocation.
 [Production verification](production-verification.md) records completed results.
 The retired CloudFormation templates, container recovery checks and historical
-AWS reports remain for engineering history; they are not the active runbook.
+AWS reports remain under [the archive](archive/phase-3-demo-deployment.md) for
+historical troubleshooting; they are not the active runbook.
 
 ## Follow-on work
 
-This completes the Phase3 deployment exception. Phase3.5 account lifecycle and
-recovery follows after the automation follow-up is merged and verified. See
+The Phase 3 portfolio hosting implementation is complete; automation activation
+still needs evidence. Phase 3.5 requires separate approval and verified closeout. Read
 [the next-phase handoff](phase-3-5-handoff.md); no hosted dev is required.

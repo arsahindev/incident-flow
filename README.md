@@ -1,52 +1,33 @@
 # IncidentFlow
 
-> Deployment checkpoint, 2026-09-15: AWS dev/prod were deleted. Vercel and Neon projects exist; Neon contains the production demo data. Ably integration and the Vercel API function/pool setup are implemented and locally checked; production is deployed at https://incidentflow-prod.vercel.app with API https://incidentflow-api-prod.vercel.app. Health/readiness, realtime logout revocation, and two-browser incident updates are verified. See [final verification](docs/production-verification.md). Previous AWS URLs and administrator references below are historical. Local demo data remains intact; AWS deployment scripts are disabled. See the [free public-demo deployment](docs/free-demo-deployment.md).
+IncidentFlow is a multi-tenant incident coordination SaaS portfolio project,
+built one working vertical slice at a time. Phases 0–3 provide incident lifecycle,
+service catalog, identity/authorization and authenticated realtime updates.
+Account lifecycle/recovery is planned next; alert intake and later features are
+future work. See [the current handoff and reading index](.codex/context.md) when
+starting repository work or finding the authoritative document for a topic.
 
-
-IncidentFlow is a multi-tenant incident intake, routing, notification, and response-coordination SaaS for backend teams. It is being built as a production-minded full-stack portfolio project, one working vertical slice at a time.
-
-## Current milestone: Phase 3
-
-Authenticated realtime incident coordination is working locally on top of the Phase 2 identity and service-catalog foundation:
-
-- a pnpm monorepo;
-- a Next.js dashboard with incident creation, listing, detail, lifecycle controls, and URL-backed filters;
-- a service catalog with service-owned environments, ownership, criticality tiers, and operational status;
-- many-to-many affected-service links with one primary service per newly created incident;
-- validated Fastify APIs for teams, services, environments, and incidents;
-- Prisma migrations and an idempotent seed with a development organization, team, and realistic service catalog;
-- transactional incident activity history for creation, assignment, status, and affected-service changes;
-- PostgreSQL constraint tests and a GitHub Actions quality pipeline;
-- PostgreSQL in Docker Compose with a persistent named volume;
-- opaque, revocable server-managed sessions with Argon2id password hashing and login throttling;
-- users, organization/team memberships, invitations, organization switching, and actor-aware audit records;
-- centralized owner/admin/responder/viewer permissions enforced by the API and reflected in the UI;
-- cross-tenant IDOR, role-boundary, invitation, session-rotation/revocation, suspended-membership, and disabled-user integration tests;
-- shared Zod identity/session contracts and a stable coded API error envelope with request correlation IDs;
-- shared runtime incident and realtime signal contracts with a monotonic version on every incident;
-- a tested native-fetch backend-for-frontend boundary covering `204`, network failures, malformed/non-JSON responses, and runtime response validation;
-- a transport-independent `RealtimePublisher` application port with a no-op test implementation;
-- a Socket.IO adapter authenticated through the existing revocable session system, with strict browser-origin validation;
-- server-derived organization and user rooms plus tenant-authorized incident-room joins;
-- live incident creation, status, assignment, affected-service, and activity signals;
-- client-side stale-signal rejection and canonical API refetch after accepted signals and reconnects;
-- bounded inbound/outbound payloads, volatile backpressure handling, slow-client disconnection, session revalidation, and metrics seams;
-- focused socket integration tests for authentication, room authorization, tenant isolation, revocation, and backpressure.
-
-Account lifecycle and recovery is planned for Phase 3.5. Queues, webhook intake, broad incident notifications, and AI remain intentionally deferred. The prod-only Vercel/Neon/Ably portfolio deployment does not advance the product roadmap.
+The portfolio hosting choice is one Vercel + Neon + Ably production demo with
+local Docker development. Read [environment access](docs/environment-access.md)
+for demo links/accounts, [the hosting guide](docs/free-demo-deployment.md) for
+configuration/manual recovery, and [the release runbook](docs/github-deployment.md)
+for automatic deployment and activation evidence. Read [production verification](docs/production-verification.md)
+only for dated results; it is not a current service-health assertion.
 
 ## Prerequisites
 
-- Node.js 22
-- pnpm 11
+- Node.js 24.x (`nvm install` / `nvm use` from the repository root)
+- pnpm 11.20.0
 - Docker with Docker Compose
 
 ## Local setup
 
+Create only missing environment files; preserve existing values and local data.
+
 ```bash
-cp .env.example .env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env.local
+test -f .env || cp .env.example .env
+test -f apps/api/.env || cp apps/api/.env.example apps/api/.env
+test -f apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local
 pnpm install
 docker compose up -d db
 pnpm db:migrate
@@ -60,12 +41,9 @@ The applications are then available at:
 - API health check: <http://localhost:4000/health>
 - API readiness check: <http://localhost:4000/ready>
 
-The idempotent development seed creates this local owner account:
-
-- Email: `admin@incidentflow.local`
-- Password: `IncidentFlow-Dev-2026!`
-
-These are local demonstration credentials only; do not deploy them to a shared environment.
+Local owner and public responder credentials, seed behavior and access boundaries
+are documented in [environment access](docs/environment-access.md); read it when
+signing in or reseeding. Never deploy the known local owner credentials.
 
 The development command runs the contracts compiler, web app, and API together. To run either application alone after `pnpm install`:
 
@@ -76,34 +54,16 @@ pnpm --filter @incidentflow/api dev
 
 The repository includes focused `api.code-workspace`, `web.code-workspace`, and `contracts.code-workspace` files. Each opens only its application/package, so Quick Open and workspace search do not include sibling projects, while Source Control still discovers the parent monorepo. Each focused workspace also provides relevant Run and Debug entries. The API server debugger first compiles with `tsc`, runs `dist/server.js`, and maps breakpoints back to `src` through emitted source maps; the Next.js full-stack configuration attaches to server code and opens a Chrome debugger for client code; the contracts configuration debugs its Node test suite. Ensure PostgreSQL is running and the API/web environment files exist before starting application debuggers.
 
-Environment configuration is owned by the process that consumes it. The root `.env` configures only the Docker Compose PostgreSQL container, `apps/api/.env` configures Fastify and Prisma, and `apps/web/.env.local` configures Next.js. `DATABASE_URL`, `WEB_ORIGIN`, `PASSWORD_PEPPER`, `API_URL`, and `NEXT_PUBLIC_REALTIME_URL` are required and validated with field-specific startup/build errors; bounded listener/realtime tuning retains documented safe defaults. Generate a production pepper with `openssl rand -base64 32`, store it separately from PostgreSQL in the deployment secret store, and never log or commit it. The checked-in API example contains a local-development-only value. `NEXT_PUBLIC_REALTIME_URL` is public and frozen into the browser bundle during `next build`, so deployments must provide the same value during build and startup; changing only the startup value cannot rewrite the bundle. `API_URL` remains server-only runtime configuration. Configuration failures are logged without values and are never reclassified as API network failures.
-
-Local Socket.IO shares the API listener and authenticates the `incidentflow_session` cookie against the exact `WEB_ORIGIN`. Hosted production uses Ably instead: the browser requests a short-lived, subscribe-only token from the same-origin Next.js endpoint, which authenticates against Fastify. The opaque session cookie stays on the web host; the Ably server key stays in the API's production environment.
-
-Realtime messages intentionally contain only an incident ID, event type, schema version, incident version, and timestamp. They are update signals, not canonical state or durable events: the dashboard refetches the normal authenticated API after a signal or reconnect.
-
-## Sharing the production demo
-
-- [Web app](https://incidentflow-prod.vercel.app)
-- [API health](https://incidentflow-api-prod.vercel.app/health)
-- [Database readiness](https://incidentflow-api-prod.vercel.app/ready)
-- Public responder: `demo+prod@incidentflow.demo` / `IncidentFlow-Demo-prod-2026!`
-
-Production runs on Vercel Hobby, Neon Free and Ably Free. Local Docker remains
-available; hosted dev and all project AWS resources were retired for cost.
-Private owner credentials are kept outside Git and never shown on the login page.
-See [environment access](docs/environment-access.md), the
-[deployment guide](docs/free-demo-deployment.md), and
-[verified checks](docs/production-verification.md).
-
-The CI workflow deploys API then web after a push/merge to `main` passes quality
-checks, applies migrations and verifies public endpoints. One-time production
-secret setup and the first real run are pending; follow the
-[activation and release runbook](docs/github-deployment.md). The AWS scripts
-remain disabled. See the [Phase 3.5 handoff](docs/phase-3-5-handoff.md) before
-starting the next milestone.
+Configuration belongs to the consuming process: root `.env` for Docker PostgreSQL,
+`apps/api/.env` for Fastify/Prisma, and `apps/web/.env.local` for Next.js.
+Read [runtime configuration](docs/architecture.md#runtime-configuration-and-hosting-adapters)
+when changing configuration, API boundaries or realtime transport.
 
 ## Quality checks
+
+For code changes, select checks proportionate to risk and complete required gates.
+Documentation-only changes need link/reference checks and `git diff --check`, not
+application tests, database tests or builds.
 
 ```bash
 pnpm lint
@@ -138,32 +98,13 @@ pnpm db:seed
 
 `docker compose down` stops the database but preserves `postgres_data`, so data survives container recreation. Running `docker compose down --volumes` deliberately deletes that local data.
 
-## Repository structure
+## Design and scope
 
-```text
-incidentflow/
-├── apps/
-│   ├── api/                 # Fastify HTTP API
-│   ├── web/                 # Next.js dashboard
-│   └── worker/              # Added when asynchronous work begins
-├── packages/
-│   └── contracts/           # Shared Zod schemas and TypeScript types
-├── infra/
-│   └── cloudformation/      # Added during the cloud phase
-├── docker-compose.yml
-└── pnpm-workspace.yaml
-```
+- [Architecture and engineering requirements](docs/architecture.md) — read when changing runtime boundaries or finding relevant source directories/ERDs.
+- [Product/domain requirements](docs/product-domain.md) — read when changing domain behavior or data relationships.
+- [Roadmap](docs/roadmap.md) — read when scoping an approved future milestone.
+- [Phase 3.5 handoff](docs/phase-3-5-handoff.md) — read before approved account-lifecycle work; includes prerequisites and a reusable prompt.
 
-## Architecture diagrams
-
-- [Identity and authorization ERD](diagrams/auth.svg)
-- [Incident and service-catalog ERD](diagrams/incident-and-service.svg)
-
-## Roadmap boundary
-
-Phase 3 and its portfolio deployment are complete. The deployment branch was merged in PR #5; automatic deployment is a separate follow-up. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
-
-Architecture decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md), [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md), and [ADR 0003: authenticated realtime update signals](docs/decisions/0003-authenticated-realtime-update-signals.md).
-
-Node.js runtime: **24.x** across workspace packages, CI and Vercel. Run
-`nvm install` and `nvm use` from the repository root to use `.nvmrc`.
+The context index links individual ADRs and historical records with selective
+reading guidance. AWS deployment procedures are archived; they are not the
+current deployment path. Do not start a product phase from a documentation task.

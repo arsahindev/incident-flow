@@ -1,6 +1,9 @@
 # Production deployment after merges to main
 
-The `CI` workflow in `.github/workflows/ci.yml` checks pull requests and branch
+Read when activating or operating releases. This describes the checked-in
+[CI workflow](../.github/workflows/ci.yml), not proof of an operational hosted pipeline.
+
+The `CI` workflow checks pull requests and branch
 pushes. A push to `main` (including a merged PR) deploys production only after
 `quality` succeeds. Feature branches and PRs never deploy. No hosted dev or AWS
 resources are needed. Keep Vercel's independent Git integration disconnected so
@@ -8,23 +11,27 @@ it cannot bypass these checks.
 
 ## One-time activation
 
-The GitHub `production` environment exists and permits only the `main` branch.
-Before merging this automation, add these **environment secrets** under repository
-Settings → Environments → production:
+The 2026-09-15 report recorded a GitHub `production` environment allowing only
+`main`, with no environment secrets and no first deployment run. This external
+state has not been rechecked. Before declaring activation complete, verify the
+remote merge/runtime follow-up, main-only policy and a successful main release.
+If still missing, authorized setup requires these **environment secrets** under
+repository Settings → Environments → production:
 
 | Secret | Source |
 | --- | --- |
 | VERCEL_TOKEN | Vercel CI access token scoped to arscodings-projects |
 | PRODUCTION_DATABASE_URL | Direct DATABASE_URL from ignored .deployment/neon-production.env, not DATABASE_URL_POOLED |
 
-Activation status: secret setup is pending; the first main-branch deployment has
-not run. Never commit these values. The token can be handed to the local setup
-process through ignored `.deployment/vercel-ci.env` as `VERCEL_TOKEN=...`.
+Last recorded activation status: secret setup and the first main release were
+pending. Current status requires external evidence; never commit these values.
+The token can be handed to the local setup process through ignored
+`.deployment/vercel-ci.env` as `VERCEL_TOKEN=...`.
 Rotate the GitHub secret when the token expires. Existing API secrets stay in
 Vercel; the workflow does not need the owner password, pepper or Ably key.
 
-Public team/project IDs are pinned in the workflow. Node24, pnpm11.20.0 and
-Vercel CLI59.17.0 are used. CLI source uploads build against each project's
+Public team/project IDs are pinned in the workflow. Node 24, pnpm 11.20.0 and
+Vercel CLI 59.17.0 are used. CLI source uploads build against each project's
 existing production settings and variables, using root directories `apps/api`
 and `apps/web`. `.vercelignore` excludes private local files.
 

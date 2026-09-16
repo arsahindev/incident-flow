@@ -1,5 +1,11 @@
 # Deployment verification - 2026-09-11
 
+> Historical record: AWS deployment was retired in September 2026. Commands,
+> endpoints, retained-resource claims and pending steps below describe that
+> period only; they do not authorize execution or establish current cloud state.
+> Read [the active hosting guide](../free-demo-deployment.md) for current procedures.
+> AWS scripts remain disabled. Do not recreate resources from this document.
+
 Scope: deploy the existing Phase 3 state to isolated dev/prod environments in
 `eu-central-1`, using profile `incidentflow` and CloudFormation. No later product
 phase, Git commit, or Git push is included.
@@ -83,3 +89,30 @@ last in a multi-root bundle reproduced the failure with `sslcert`. Loading the
 complete bundle via OpenSSL `SSL_CERT_FILE` fixed it while preserving strict
 verification. The revised test passes all five migrations, seed and public routes.
 The earlier digest above is a failed release, not the final deployed artifact.
+
+## Additional recovery checkpoint from the former context
+
+### Historical AWS deployment recovery — 2026-09-11 (retired)
+
+- Inspected branch `codex/phase-3-deployment`, HEAD `2359442cb9ec`, history,
+  working tree, CloudFormation resources, ECR, and retained App Runner logs before edits.
+  The pre-existing untracked root `AGENTS.md` is preserved.
+- Initial dev image `dev-17d637566218` applied all five migrations, then seed
+  failed with Prisma P1011: `self-signed certificate in certificate chain`.
+  Startup exited before opening listeners. CloudFormation rolled back all live
+  resources; snapshot `incidentflow-dev-snapshot-database-py2ahb8shcfd` remains.
+- The container bundles public eu-central-1 RDS roots. node-postgres uses
+  `verify-full`/`sslrootcert`; Prisma Migrate uses `require`/`sslaccept=strict` with OpenSSL `SSL_CERT_FILE`.
+  Next.js runs with `apps/web` as its actual working directory, fixing both build
+  discovery and TypeScript config imports.
+- The disposable container regression verifies rejection of an untrusted CA and
+  wrong hostname, five migrations from empty PostgreSQL, seed, and HTTP 200 for
+  `/health`, `/ready`, and `/login` through Nginx.
+- Local lint/typecheck/build/audit pass; tests: contracts 4, API 34, web 12;
+  database integration 6/6, migration status current at five migrations.
+- Deployment tags include source content so an uncommitted fix cannot silently
+  reuse an old Git-only image. Promote the verified digest to an immutable prod
+  tag. CloudFormation remains the infrastructure authority; exact origins are
+  applied after generated hostnames exist and preserved during later updates.
+- Public dev verification found App Runner rejects WebSocket upgrades but authenticated Socket.IO polling works. The browser now enables `tryAllTransports`; CloudFormation caps active instances at one to preserve in-memory polling sessions and rooms. Deployment overlap can briefly disconnect clients; reconnect/refetch remains authoritative.
+- No Phase 3.5 or later product scope is started; no commit/push is authorized.

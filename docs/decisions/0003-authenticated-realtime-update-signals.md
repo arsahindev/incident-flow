@@ -4,6 +4,10 @@
 - Date: 2026-08-27
 - Milestone: Phase 3
 
+This decision remains authoritative for shared signal guarantees and local
+Socket.IO. Hosted production uses the Ably transport in
+[ADR 0005](0005-free-portfolio-hosting.md); its browser does not connect to Socket.IO.
+
 ## Context
 
 Incident responders need to see incident creation and coordination changes without manually reloading the dashboard. The existing security model keeps an opaque server-managed session in an `HttpOnly` cookie owned by the Next.js backend-for-frontend, so browser JavaScript cannot safely place that token in Socket.IO's `auth` payload. Realtime delivery must also remain replaceable by a later AWS transport and must not become a second source of incident truth.

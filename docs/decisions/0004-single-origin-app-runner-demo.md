@@ -1,8 +1,14 @@
 # ADR 0004: Single-origin CloudFormation App Runner demo
 
-- Status: Retired on 2026-09-14 due to recurring cost; replacement proposed in [ADR 0005](0005-free-portfolio-hosting.md)
+- Status: Retired on 2026-09-14 due to recurring cost; superseded by [ADR 0005](0005-free-portfolio-hosting.md)
 - Date: 2026-09-11
 - Milestone: Deployment enablement between Phases 3 and 3.5
+
+> Retired decision record. All deployment, secret-location, retained-snapshot
+> and pending-rollout statements below describe the historical AWS topology.
+> They are not current instructions or cloud-state verification. Read the
+> [archived runbook](../archive/phase-3-demo-deployment.md) for historical procedures,
+> or ADR 0005 for the replacement decision.
 
 ## Context
 

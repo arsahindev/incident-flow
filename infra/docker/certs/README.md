@@ -1,5 +1,10 @@
 # RDS trust bundle
 
+Historical AWS container asset; not part of the active Vercel/Neon deployment.
+Read [the archived recovery report](../../../docs/archive/deployment-verification-2026-09-11.md)
+when investigating the old TLS failure. Instructions below concern the retired
+container path and do not authorize redeployment or recreation of AWS resources.
+
 `eu-central-1-bundle.pem` is the public Amazon RDS regional CA bundle downloaded
 on 2026-09-11 from:
 https://truststore.pki.rds.amazonaws.com/eu-central-1/eu-central-1-bundle.pem
