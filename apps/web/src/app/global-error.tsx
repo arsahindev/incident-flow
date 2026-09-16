@@ -33,7 +33,8 @@ export default function GlobalError({
           Application could not start
         </h1>
         <p className="mt-3 max-w-md text-slate-400">
-          The root layout failed to load. Please ensure the database and API services are online.
+          The root layout failed to load. Please ensure the database and API
+          services are online.
         </p>
         <button
           type="button"

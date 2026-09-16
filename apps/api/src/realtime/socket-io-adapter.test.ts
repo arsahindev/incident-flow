@@ -2,8 +2,14 @@ import assert from "node:assert/strict";
 import { createServer, type Server as HttpServer } from "node:http";
 import { test } from "node:test";
 
-import type { AuthContext, RealtimeIncidentSignal } from "@incidentflow/contracts";
-import { io as createClient, type Socket as ClientSocket } from "socket.io-client";
+import type {
+  AuthContext,
+  RealtimeIncidentSignal,
+} from "@incidentflow/contracts";
+import {
+  io as createClient,
+  type Socket as ClientSocket,
+} from "socket.io-client";
 
 import { AuthenticationError } from "../auth/errors.js";
 import { permissionsForRole } from "../auth/permissions.js";
@@ -35,8 +41,10 @@ function authContext(
     email: `${userId.slice(0, 4)}@example.com`,
     displayName: "Realtime User",
     organizationId,
-    organizationSlug: organizationId === organizationA ? "organization-a" : "organization-b",
-    organizationName: organizationId === organizationA ? "Organization A" : "Organization B",
+    organizationSlug:
+      organizationId === organizationA ? "organization-a" : "organization-b",
+    organizationName:
+      organizationId === organizationA ? "Organization A" : "Organization B",
     role: "viewer",
     permissions: permissionsForRole("viewer"),
   };
@@ -68,7 +76,9 @@ function connect(socket: ClientSocket) {
 }
 
 async function startAdapter(
-  options: Partial<ConstructorParameters<typeof SocketIoRealtimeAdapter>[0]> = {},
+  options: Partial<
+    ConstructorParameters<typeof SocketIoRealtimeAdapter>[0]
+  > = {},
 ) {
   let revokedToken: string | null = null;
   const contexts = new Map([
@@ -102,7 +112,8 @@ async function startAdapter(
   adapter.attach(server);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  if (!address || typeof address === "string") throw new Error("Test server did not bind");
+  if (!address || typeof address === "string")
+    throw new Error("Test server did not bind");
   return {
     adapter,
     metrics,
@@ -154,10 +165,12 @@ test("socket authentication and incident joins are tenant-authorized", async () 
     const crossTenant = await socketB
       .timeout(1_000)
       .emitWithAck("realtime:join-incident", { incidentId: incidentA });
-    const forgedTenant = await socketA.timeout(1_000).emitWithAck(
-      "realtime:join-incident",
-      { incidentId: incidentA, organizationId: organizationB },
-    );
+    const forgedTenant = await socketA
+      .timeout(1_000)
+      .emitWithAck("realtime:join-incident", {
+        incidentId: incidentA,
+        organizationId: organizationB,
+      });
 
     assert.deepEqual(authorized, { ok: true });
     assert.deepEqual(crossTenant, { ok: false, code: "permission_denied" });
@@ -191,7 +204,11 @@ test("organization publications do not cross tenants and revocation disconnects 
       socketA,
       "realtime:incident",
     );
-    await runtime.adapter.publishIncidentSignal(organizationA, incidentA, signal);
+    await runtime.adapter.publishIncidentSignal(
+      organizationA,
+      incidentA,
+      signal,
+    );
     assert.deepEqual(await delivered, signal);
     await new Promise((resolve) => setTimeout(resolve, 25));
     assert.equal(receivedByA.length, 1);
@@ -243,7 +260,10 @@ test("outbound payload and room-count limits are enforced", async () => {
       }),
       /payload limit/,
     );
-    assert.equal(runtime.metrics.snapshot().droppedSignals.payload_too_large, 1);
+    assert.equal(
+      runtime.metrics.snapshot().droppedSignals.payload_too_large,
+      1,
+    );
   } finally {
     await close(runtime.adapter, runtime.server, [socketA]);
   }
@@ -268,7 +288,10 @@ test("handshakes reject missing sessions and untrusted origins", async () => {
     assert.equal(foreignOrigin.connected, false);
     assert.equal(runtime.metrics.snapshot().rejectedAuthentications, 1);
   } finally {
-    await close(runtime.adapter, runtime.server, [missingSession, foreignOrigin]);
+    await close(runtime.adapter, runtime.server, [
+      missingSession,
+      foreignOrigin,
+    ]);
   }
 });
 

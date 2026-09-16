@@ -1,7 +1,4 @@
-import {
-  ConfigurationError,
-  configurationFailureLog,
-} from "./lib/env/schema";
+import { ConfigurationError, configurationFailureLog } from "./lib/env/schema";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;

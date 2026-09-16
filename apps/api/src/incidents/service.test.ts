@@ -3,7 +3,10 @@ import { test } from "node:test";
 
 import type { RealtimeIncidentSignal } from "@incidentflow/contracts";
 
-import { NoopRealtimePublisher, type RealtimePublisher } from "../realtime/publisher.js";
+import {
+  NoopRealtimePublisher,
+  type RealtimePublisher,
+} from "../realtime/publisher.js";
 import { ownerTestAuthContext } from "../test-auth-context.js";
 import type { IncidentRepository } from "./repository.js";
 import { IncidentApplicationService } from "./service.js";
@@ -74,9 +77,13 @@ test("incident application service publishes versioned signals after persistence
     publisher,
   );
 
-  const updated = await service.updateIncident(ownerTestAuthContext, incidentId, {
-    status: "acknowledged",
-  });
+  const updated = await service.updateIncident(
+    ownerTestAuthContext,
+    incidentId,
+    {
+      status: "acknowledged",
+    },
+  );
 
   assert.equal(updated.version, 7);
   assert.deepEqual(
@@ -101,17 +108,24 @@ test("incident application service publishes versioned signals after persistence
 test("no-op publishing and publication failures never undo a committed mutation", async () => {
   const committed = { incident: incident(2), changes: ["status"] } as const;
   const noopService = new IncidentApplicationService(
-    repository({ incident: committed.incident, changes: [...committed.changes] }),
+    repository({
+      incident: committed.incident,
+      changes: [...committed.changes],
+    }),
     new NoopRealtimePublisher(),
   );
   assert.equal(
-    (await noopService.updateIncident(ownerTestAuthContext, incidentId, {})).version,
+    (await noopService.updateIncident(ownerTestAuthContext, incidentId, {}))
+      .version,
     2,
   );
 
   const failures: unknown[] = [];
   const failingService = new IncidentApplicationService(
-    repository({ incident: committed.incident, changes: [...committed.changes] }),
+    repository({
+      incident: committed.incident,
+      changes: [...committed.changes],
+    }),
     {
       async publishIncidentSignal() {
         throw new Error("transport unavailable");
@@ -120,7 +134,8 @@ test("no-op publishing and publication failures never undo a committed mutation"
     (error) => failures.push(error),
   );
   assert.equal(
-    (await failingService.updateIncident(ownerTestAuthContext, incidentId, {})).version,
+    (await failingService.updateIncident(ownerTestAuthContext, incidentId, {}))
+      .version,
     2,
   );
   assert.equal(failures.length, 1);

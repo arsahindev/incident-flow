@@ -50,7 +50,6 @@ Free-plan quotas and cold starts still apply. No paid upgrades, new AWS resource
 Git commits, pushes or merges were performed. Source deployment used the Vercel
 CLI after the connector upload exceeded the approval-review payload limit.
 
-
 ## PR preparation checks
 
 Final combined tree: workspace lint/typecheck/build passed;4contracts,41API and

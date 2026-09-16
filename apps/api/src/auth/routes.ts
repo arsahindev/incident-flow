@@ -81,8 +81,14 @@ export async function registerAuthRoutes(
     requirePermission(request.auth, "members.manage");
     const body = createInvitationSchema.safeParse(request.body);
     if (!body.success) return sendValidationError(reply, body.error);
-    const invitation = await authService.createInvitation(request.auth, body.data);
-    return reply.code(201).header("cache-control", "no-store").send({ invitation });
+    const invitation = await authService.createInvitation(
+      request.auth,
+      body.data,
+    );
+    return reply
+      .code(201)
+      .header("cache-control", "no-store")
+      .send({ invitation });
   });
 
   app.get("/v1/invitations/:token", async (request, reply) => {
@@ -97,7 +103,10 @@ export async function registerAuthRoutes(
     if (!params.success) return sendValidationError(reply, params.error);
     const body = acceptInvitationSchema.safeParse(request.body);
     if (!body.success) return sendValidationError(reply, body.error);
-    const session = await authService.acceptInvitation(params.data.token, body.data);
+    const session = await authService.acceptInvitation(
+      params.data.token,
+      body.data,
+    );
     return reply.header("cache-control", "no-store").send({ session });
   });
 
@@ -127,7 +136,11 @@ export async function registerAuthRoutes(
     requirePermission(request.auth, "members.manage");
     const params = teamMembershipParamsSchema.safeParse(request.params);
     if (!params.success) return sendValidationError(reply, params.error);
-    await authService.addTeamMember(request.auth, params.data.teamId, params.data.userId);
+    await authService.addTeamMember(
+      request.auth,
+      params.data.teamId,
+      params.data.userId,
+    );
     return reply.code(204).send();
   });
 
@@ -135,7 +148,11 @@ export async function registerAuthRoutes(
     requirePermission(request.auth, "members.manage");
     const params = teamMembershipParamsSchema.safeParse(request.params);
     if (!params.success) return sendValidationError(reply, params.error);
-    await authService.removeTeamMember(request.auth, params.data.teamId, params.data.userId);
+    await authService.removeTeamMember(
+      request.auth,
+      params.data.teamId,
+      params.data.userId,
+    );
     return reply.code(204).send();
   });
 }

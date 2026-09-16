@@ -1,7 +1,12 @@
 export const incidentStatuses = ["open", "acknowledged", "resolved"] as const;
 export type IncidentStatus = (typeof incidentStatuses)[number];
 
-export const incidentPriorities = ["low", "medium", "high", "critical"] as const;
+export const incidentPriorities = [
+  "low",
+  "medium",
+  "high",
+  "critical",
+] as const;
 export type IncidentPriority = (typeof incidentPriorities)[number];
 
 export type TeamRecord = {
@@ -14,7 +19,13 @@ export type AffectedServiceRecord = {
   id: string;
   name: string;
   slug: string;
-  type: "application" | "api" | "platform" | "infrastructure" | "business" | "external";
+  type:
+    | "application"
+    | "api"
+    | "platform"
+    | "infrastructure"
+    | "business"
+    | "external";
   tier: "critical" | "high" | "medium" | "low";
   status: "operational" | "degraded" | "disrupted" | "maintenance";
   isPrimary: boolean;

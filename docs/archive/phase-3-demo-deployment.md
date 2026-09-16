@@ -8,7 +8,6 @@
 
 > Deployment change, 2026-09-14: AWS dev/prod were deleted at the owner's request. Previous AWS URLs and administrator references below are historical. Local demo data remains intact. The AWS CI deployment job has been removed and deployment scripts are disabled. See the [free public-demo proposal](../free-demo-deployment.md).
 
-
 Public responder account support is prepared for the next deployment. See
 [environment access](../environment-access.md) for public demo credentials, private
 administrator references, and the `PUBLIC_DEMO_ENVIRONMENT` opt-in. Do not publish

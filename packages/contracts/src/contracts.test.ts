@@ -24,7 +24,10 @@ const context = {
 };
 
 test("identity response contracts accept the documented session shapes", () => {
-  assert.equal(authSessionResponseSchema.safeParse({ session: context }).success, true);
+  assert.equal(
+    authSessionResponseSchema.safeParse({ session: context }).success,
+    true,
+  );
   assert.equal(
     sessionResultResponseSchema.safeParse({
       session: {
@@ -43,14 +46,18 @@ test("error contracts require a stable code and request correlation id", () => {
       error: {
         code: "validation_error",
         message: "Validation failed",
-        issues: [{ path: "email", message: "Invalid email", code: "invalid_format" }],
+        issues: [
+          { path: "email", message: "Invalid email", code: "invalid_format" },
+        ],
         requestId: "request-123",
       },
     }).success,
     true,
   );
   assert.equal(
-    apiErrorResponseSchema.safeParse({ error: { message: "Validation failed" } }).success,
+    apiErrorResponseSchema.safeParse({
+      error: { message: "Validation failed" },
+    }).success,
     false,
   );
 });
@@ -78,8 +85,8 @@ test("incident contracts carry a positive canonical version", () => {
     2,
   );
   assert.equal(
-    incidentResponseSchema.parse({ incident: { ...incident, activity: [] } }).incident
-      .version,
+    incidentResponseSchema.parse({ incident: { ...incident, activity: [] } })
+      .incident.version,
     2,
   );
   assert.equal(

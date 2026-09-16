@@ -1,5 +1,6 @@
 import eslint from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
+import prettierConfig from "eslint-config-prettier/flat";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
@@ -13,4 +14,5 @@ export default defineConfig(
     },
   },
   globalIgnores(["dist/**"]),
+  prettierConfig,
 );

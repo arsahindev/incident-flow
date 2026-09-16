@@ -32,15 +32,15 @@ Phase 3 adds one narrow exception: the Socket.IO handshake reads the same `HttpO
 
 Routes authorize named actions through one centralized matrix rather than scattering role-name checks:
 
-| Permission | Owner | Admin | Responder | Viewer |
-|---|:---:|:---:|:---:|:---:|
-| `incidents.read` | yes | yes | yes | yes |
-| `incidents.manage` | yes | yes | yes | no |
-| `services.read` | yes | yes | yes | yes |
-| `services.manage` | yes | yes | no | no |
-| `teams.read` | yes | yes | yes | yes |
-| `members.read` | yes | yes | yes | yes |
-| `members.manage` | yes | yes | no | no |
+| Permission         | Owner | Admin | Responder | Viewer |
+| ------------------ | :---: | :---: | :-------: | :----: |
+| `incidents.read`   |  yes  |  yes  |    yes    |  yes   |
+| `incidents.manage` |  yes  |  yes  |    yes    |   no   |
+| `services.read`    |  yes  |  yes  |    yes    |  yes   |
+| `services.manage`  |  yes  |  yes  |    no     |   no   |
+| `teams.read`       |  yes  |  yes  |    yes    |  yes   |
+| `members.read`     |  yes  |  yes  |    yes    |  yes   |
+| `members.manage`   |  yes  |  yes  |    no     |   no   |
 
 Only owners and admins can invite members, change organization roles/access, and manage team membership. The last active owner cannot be demoted or suspended. Organization suspension is distinct from globally disabling a user, because one user may belong to multiple organizations.
 

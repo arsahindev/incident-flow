@@ -19,7 +19,9 @@ function label(value: string) {
 
 export function PriorityBadge({ priority }: { priority: IncidentPriority }) {
   return (
-    <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${priorityClasses[priority]}`}>
+    <span
+      className={`rounded-full border px-2.5 py-1 text-xs font-medium ${priorityClasses[priority]}`}
+    >
       {label(priority)}
     </span>
   );
@@ -27,7 +29,9 @@ export function PriorityBadge({ priority }: { priority: IncidentPriority }) {
 
 export function StatusBadge({ status }: { status: IncidentStatus }) {
   return (
-    <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusClasses[status]}`}>
+    <span
+      className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusClasses[status]}`}
+    >
       {label(status)}
     </span>
   );

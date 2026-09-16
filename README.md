@@ -61,6 +61,13 @@ when changing configuration, API boundaries or realtime transport.
 
 ## Quality checks
 
+`pnpm lint` runs ESLint across the workspace and then checks Prettier formatting;
+the existing CI lint step checks both. Run `pnpm lint:fix` locally to apply ESLint
+autofixes and then format the monorepo, or `pnpm format` for formatting alone.
+`pnpm format:check` checks formatting without changing files. Prettier uses its
+pinned version's defaults; `.prettierignore` excludes generated files, installed
+agent skills and private local configuration.
+
 For code changes, select checks proportionate to risk and complete required gates.
 Documentation-only changes need link/reference checks and `git diff --check`, not
 application tests, database tests or builds.

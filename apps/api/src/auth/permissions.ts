@@ -34,7 +34,10 @@ export function permissionsForRole(role: OrganizationRole): Permission[] {
   return [...rolePermissions[role]];
 }
 
-export function requirePermission(context: AuthContext, permission: Permission) {
+export function requirePermission(
+  context: AuthContext,
+  permission: Permission,
+) {
   if (!context.permissions.includes(permission)) {
     throw new AuthorizationError();
   }

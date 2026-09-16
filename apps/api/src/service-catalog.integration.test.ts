@@ -45,8 +45,16 @@ test(
         prisma.$transaction(async (transaction) => {
           await transaction.organization.createMany({
             data: [
-              { id: organizationA, name: "Tenant A", slug: `tenant-a-${organizationA}` },
-              { id: organizationB, name: "Tenant B", slug: `tenant-b-${organizationB}` },
+              {
+                id: organizationA,
+                name: "Tenant A",
+                slug: `tenant-a-${organizationA}`,
+              },
+              {
+                id: organizationB,
+                name: "Tenant B",
+                slug: `tenant-b-${organizationB}`,
+              },
             ],
           });
           await transaction.service.create({
@@ -103,7 +111,11 @@ test(
             },
           });
           await transaction.incident.create({
-            data: { id: incidentId, organizationId, title: "Primary constraint" },
+            data: {
+              id: incidentId,
+              organizationId,
+              title: "Primary constraint",
+            },
           });
           await transaction.service.createMany({
             data: [
@@ -125,8 +137,18 @@ test(
           });
           await transaction.incidentAffectedService.createMany({
             data: [
-              { organizationId, incidentId, serviceId: serviceA, isPrimary: true },
-              { organizationId, incidentId, serviceId: serviceB, isPrimary: true },
+              {
+                organizationId,
+                incidentId,
+                serviceId: serviceA,
+                isPrimary: true,
+              },
+              {
+                organizationId,
+                incidentId,
+                serviceId: serviceB,
+                isPrimary: true,
+              },
             ],
           });
         }),
@@ -166,7 +188,11 @@ test(
     try {
       await prisma.organization.createMany({
         data: [
-          { id: organizationA, name: "API tenant A", slug: `api-tenant-a-${organizationA}` },
+          {
+            id: organizationA,
+            name: "API tenant A",
+            slug: `api-tenant-a-${organizationA}`,
+          },
           { id: organizationB, name: "API tenant B", slug: organizationBSlug },
         ],
       });
@@ -191,10 +217,15 @@ test(
 
       assert.equal(response.statusCode, 404);
       assert.equal(response.json().error.code, "not_found");
-      assert.equal(response.json().error.message, "Affected service was not found");
+      assert.equal(
+        response.json().error.message,
+        "Affected service was not found",
+      );
       assert.ok(response.json().error.requestId);
       assert.equal(
-        await prisma.incident.count({ where: { organizationId: organizationB } }),
+        await prisma.incident.count({
+          where: { organizationId: organizationB },
+        }),
         0,
       );
     } finally {

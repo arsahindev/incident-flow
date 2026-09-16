@@ -21,7 +21,9 @@ export const switchOrganizationSchema = z.object({
   organizationSlug: z.string().trim().min(2).max(100),
 });
 
-export const invitationTokenParamsSchema = z.object({ token: z.string().min(32).max(200) });
+export const invitationTokenParamsSchema = z.object({
+  token: z.string().min(32).max(200),
+});
 
 export const createInvitationSchema = z.object({
   email: z.email().trim().toLowerCase(),
@@ -42,9 +44,12 @@ export const updateMemberSchema = z
     role: z.enum(organizationRoles).optional(),
     status: z.enum(membershipStatuses).optional(),
   })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), {
-    message: "At least one field must be provided",
-  });
+  .refine(
+    (input) => Object.values(input).some((value) => value !== undefined),
+    {
+      message: "At least one field must be provided",
+    },
+  );
 
 export const teamMembershipParamsSchema = z.object({
   teamId: z.uuid(),

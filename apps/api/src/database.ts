@@ -4,7 +4,10 @@ import { Pool } from "pg";
 
 import { PrismaClient } from "./generated/prisma/client.js";
 
-export function createPrismaClient(databaseUrl: string, options: { vercel?: boolean } = {}) {
+export function createPrismaClient(
+  databaseUrl: string,
+  options: { vercel?: boolean } = {},
+) {
   if (options.vercel) {
     const pool = new Pool({
       connectionString: databaseUrl,
@@ -20,5 +23,7 @@ export function createPrismaClient(databaseUrl: string, options: { vercel?: bool
       adapter: new PrismaPg(pool, { disposeExternalPool: true }),
     });
   }
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+  return new PrismaClient({
+    adapter: new PrismaPg({ connectionString: databaseUrl }),
+  });
 }

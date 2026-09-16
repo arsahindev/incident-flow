@@ -80,7 +80,10 @@ test("service routes list and return catalog records", async () => {
   assert.equal(listResponse.statusCode, 200);
   assert.equal(listResponse.json().services[0].name, "Checkout API");
   assert.equal(detailResponse.statusCode, 200);
-  assert.equal(detailResponse.json().service.environments[0].kind, "production");
+  assert.equal(
+    detailResponse.json().service.environments[0].kind,
+    "production",
+  );
   await app.close();
 });
 

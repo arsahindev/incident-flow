@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-export const organizationRoles = ["owner", "admin", "responder", "viewer"] as const;
+export const organizationRoles = [
+  "owner",
+  "admin",
+  "responder",
+  "viewer",
+] as const;
 export const organizationRoleSchema = z.enum(organizationRoles);
 export type OrganizationRole = z.infer<typeof organizationRoleSchema>;
 
@@ -51,8 +56,12 @@ export const sessionResultSchema = z.object({
 });
 export type SessionResult = z.infer<typeof sessionResultSchema>;
 
-export const authSessionResponseSchema = z.object({ session: authContextSchema });
-export const sessionResultResponseSchema = z.object({ session: sessionResultSchema });
+export const authSessionResponseSchema = z.object({
+  session: authContextSchema,
+});
+export const sessionResultResponseSchema = z.object({
+  session: sessionResultSchema,
+});
 
 export const organizationAccessSchema = z.object({
   id: z.uuid(),
@@ -79,7 +88,9 @@ export type OrganizationMember = z.infer<typeof organizationMemberSchema>;
 export const membersResponseSchema = z.object({
   members: z.array(organizationMemberSchema),
 });
-export const memberResponseSchema = z.object({ member: organizationMemberSchema });
+export const memberResponseSchema = z.object({
+  member: organizationMemberSchema,
+});
 
 export const invitationSchema = z.object({
   id: z.uuid(),
@@ -94,7 +105,9 @@ export const createdInvitationSchema = invitationSchema.extend({
   token: z.string().min(32),
 });
 export type CreatedInvitation = z.infer<typeof createdInvitationSchema>;
-export const invitationResponseSchema = z.object({ invitation: invitationSchema });
+export const invitationResponseSchema = z.object({
+  invitation: invitationSchema,
+});
 export const createdInvitationResponseSchema = z.object({
   invitation: createdInvitationSchema,
 });

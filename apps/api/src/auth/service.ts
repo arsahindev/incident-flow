@@ -6,7 +6,10 @@ import type {
   Prisma,
   PrismaClient,
 } from "../generated/prisma/client.js";
-import { ResourceConflictError, ResourceNotFoundError } from "../incidents/repository.js";
+import {
+  ResourceConflictError,
+  ResourceNotFoundError,
+} from "../incidents/repository.js";
 import { AuthenticationError, LoginRateLimitError } from "./errors.js";
 import { hashPassword, verifyPasswordHash } from "./passwords.js";
 import { permissionsForRole } from "./permissions.js";
@@ -89,7 +92,10 @@ export interface AuthService {
     clientAddress: string;
   }): Promise<SessionResult>;
   logout(token: string): Promise<void>;
-  switchOrganization(token: string, organizationSlug: string): Promise<SessionResult>;
+  switchOrganization(
+    token: string,
+    organizationSlug: string,
+  ): Promise<SessionResult>;
   listOrganizations(context: AuthContext): Promise<OrganizationAccess[]>;
   listMembers(context: AuthContext): Promise<MemberRecord[]>;
   createInvitation(
@@ -106,8 +112,16 @@ export interface AuthService {
     userId: string,
     input: { role?: OrganizationRole; status?: MembershipStatus },
   ): Promise<MemberRecord>;
-  addTeamMember(context: AuthContext, teamId: string, userId: string): Promise<void>;
-  removeTeamMember(context: AuthContext, teamId: string, userId: string): Promise<void>;
+  addTeamMember(
+    context: AuthContext,
+    teamId: string,
+    userId: string,
+  ): Promise<void>;
+  removeTeamMember(
+    context: AuthContext,
+    teamId: string,
+    userId: string,
+  ): Promise<void>;
 }
 
 export class PrismaAuthService implements AuthService {
@@ -194,7 +208,9 @@ export class PrismaAuthService implements AuthService {
       throw new AuthenticationError("Invalid email or password");
     }
 
-    await this.prisma.loginThrottle.deleteMany({ where: { keyHash: throttleKey } });
+    await this.prisma.loginThrottle.deleteMany({
+      where: { keyHash: throttleKey },
+    });
     return this.createSession({
       user,
       organization: membership.organization,
@@ -278,7 +294,9 @@ export class PrismaAuthService implements AuthService {
       select: { userId: true },
     });
     if (existingMember) {
-      throw new ResourceConflictError("That email already belongs to this organization");
+      throw new ResourceConflictError(
+        "That email already belongs to this organization",
+      );
     }
 
     const token = createOpaqueToken();
@@ -363,7 +381,9 @@ export class PrismaAuthService implements AuthService {
         this.passwordPepper,
       );
       if (!passwordVerification.matches || existingUser.status !== "ACTIVE") {
-        throw new AuthenticationError("Existing account credentials are invalid");
+        throw new AuthenticationError(
+          "Existing account credentials are invalid",
+        );
       }
       existingPasswordNeedsRehash = passwordVerification.needsRehash;
     }
@@ -448,7 +468,10 @@ export class PrismaAuthService implements AuthService {
     return this.prisma.$transaction(async (transaction) => {
       const membership = await transaction.organizationMembership.findUnique({
         where: {
-          organizationId_userId: { organizationId: context.organizationId, userId },
+          organizationId_userId: {
+            organizationId: context.organizationId,
+            userId,
+          },
         },
         include: {
           user: true,
@@ -472,13 +495,18 @@ export class PrismaAuthService implements AuthService {
           },
         });
         if (activeOwners <= 1) {
-          throw new ResourceConflictError("The organization must keep one active owner");
+          throw new ResourceConflictError(
+            "The organization must keep one active owner",
+          );
         }
       }
 
       const updated = await transaction.organizationMembership.update({
         where: {
-          organizationId_userId: { organizationId: context.organizationId, userId },
+          organizationId_userId: {
+            organizationId: context.organizationId,
+            userId,
+          },
         },
         data: {
           role: input.role ? roleToPrisma[input.role] : undefined,
@@ -493,7 +521,11 @@ export class PrismaAuthService implements AuthService {
       });
       if (input.status === "suspended") {
         await transaction.session.updateMany({
-          where: { organizationId: context.organizationId, userId, revokedAt: null },
+          where: {
+            organizationId: context.organizationId,
+            userId,
+            revokedAt: null,
+          },
           data: { revokedAt: new Date() },
         });
       }
@@ -511,13 +543,19 @@ export class PrismaAuthService implements AuthService {
     await this.prisma.$transaction(async (transaction) => {
       const team = await transaction.team.findUnique({
         where: {
-          organizationId_id: { organizationId: context.organizationId, id: teamId },
+          organizationId_id: {
+            organizationId: context.organizationId,
+            id: teamId,
+          },
         },
         select: { id: true },
       });
       const membership = await transaction.organizationMembership.findUnique({
         where: {
-          organizationId_userId: { organizationId: context.organizationId, userId },
+          organizationId_userId: {
+            organizationId: context.organizationId,
+            userId,
+          },
         },
         select: { userId: true, status: true },
       });
@@ -550,7 +588,8 @@ export class PrismaAuthService implements AuthService {
       const removed = await transaction.teamMembership.deleteMany({
         where: { organizationId: context.organizationId, teamId, userId },
       });
-      if (removed.count === 0) throw new ResourceNotFoundError("Team membership");
+      if (removed.count === 0)
+        throw new ResourceNotFoundError("Team membership");
       await this.writeAudit(transaction, context, {
         action: "team.member_removed",
         entityType: "team",
@@ -580,21 +619,29 @@ export class PrismaAuthService implements AuthService {
   }
 
   private async assertLoginAllowed(keyHash: string) {
-    const throttle = await this.prisma.loginThrottle.findUnique({ where: { keyHash } });
+    const throttle = await this.prisma.loginThrottle.findUnique({
+      where: { keyHash },
+    });
 
     const now = new Date();
     if (throttle?.lockedUntil && now < throttle.lockedUntil) {
       throw new LoginRateLimitError(
-        Math.max(1, Math.ceil((throttle.lockedUntil.getTime() - Date.now()) / 1_000)),
+        Math.max(
+          1,
+          Math.ceil((throttle.lockedUntil.getTime() - Date.now()) / 1_000),
+        ),
       );
     }
   }
 
   private async recordLoginFailure(keyHash: string) {
     const now = new Date();
-    const current = await this.prisma.loginThrottle.findUnique({ where: { keyHash } });
+    const current = await this.prisma.loginThrottle.findUnique({
+      where: { keyHash },
+    });
     const windowExpired =
-      !current || current.windowStartedAt.getTime() <= now.getTime() - throttleWindowMs;
+      !current ||
+      current.windowStartedAt.getTime() <= now.getTime() - throttleWindowMs;
     const attemptCount = windowExpired ? 1 : current.attemptCount + 1;
     await this.prisma.loginThrottle.upsert({
       where: { keyHash },
@@ -603,13 +650,17 @@ export class PrismaAuthService implements AuthService {
         attemptCount,
         windowStartedAt: now,
         lockedUntil:
-          attemptCount >= maxLoginAttempts ? new Date(now.getTime() + throttleLockMs) : null,
+          attemptCount >= maxLoginAttempts
+            ? new Date(now.getTime() + throttleLockMs)
+            : null,
       },
       update: {
         attemptCount,
         windowStartedAt: windowExpired ? now : undefined,
         lockedUntil:
-          attemptCount >= maxLoginAttempts ? new Date(now.getTime() + throttleLockMs) : null,
+          attemptCount >= maxLoginAttempts
+            ? new Date(now.getTime() + throttleLockMs)
+            : null,
       },
     });
   }
@@ -620,7 +671,9 @@ export class PrismaAuthService implements AuthService {
     status: PrismaMembershipStatus;
     createdAt: Date;
     user: { email: string; displayName: string; status: string };
-    teamMemberships: Array<{ team: { id: string; name: string; slug: string } }>;
+    teamMemberships: Array<{
+      team: { id: string; name: string; slug: string };
+    }>;
   }): MemberRecord {
     return {
       userId: membership.userId,

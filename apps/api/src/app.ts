@@ -45,7 +45,9 @@ export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({ logger: options.logger ?? true });
 
   if (
-    (options.incidentRepository || options.serviceRepository || options.realtimeTokenIssuer) &&
+    (options.incidentRepository ||
+      options.serviceRepository ||
+      options.realtimeTokenIssuer) &&
     !options.authService &&
     !options.testAuthContext
   ) {
@@ -101,7 +103,8 @@ export function buildApp(options: BuildAppOptions = {}) {
       path === "/ready" ||
       (request.method === "POST" && path === "/v1/auth/login") ||
       (request.method === "GET" && /^\/v1\/invitations\/[^/]+$/.test(path)) ||
-      (request.method === "POST" && /^\/v1\/invitations\/[^/]+\/accept$/.test(path));
+      (request.method === "POST" &&
+        /^\/v1\/invitations\/[^/]+\/accept$/.test(path));
     if (isPublic) return;
 
     if (options.testAuthContext) {
@@ -110,7 +113,9 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
     if (!options.authService) throw new AuthenticationError();
 
-    request.auth = await options.authService.authenticateToken(extractSessionToken(request));
+    request.auth = await options.authService.authenticateToken(
+      extractSessionToken(request),
+    );
   });
 
   if (options.authService) {
@@ -132,7 +137,8 @@ export function buildApp(options: BuildAppOptions = {}) {
   if (options.incidentRepository) {
     void app.register(registerIncidentRoutes, {
       repository: options.incidentRepository,
-      realtimePublisher: options.realtimePublisher ?? new NoopRealtimePublisher(),
+      realtimePublisher:
+        options.realtimePublisher ?? new NoopRealtimePublisher(),
     });
   }
 
@@ -143,7 +149,12 @@ export function buildApp(options: BuildAppOptions = {}) {
   }
 
   app.setNotFoundHandler((request, reply) =>
-    sendApiError(reply, 404, "not_found", `${request.method} ${request.url} was not found`),
+    sendApiError(
+      reply,
+      404,
+      "not_found",
+      `${request.method} ${request.url} was not found`,
+    ),
   );
 
   app.setErrorHandler((error, _request, reply) => {
@@ -168,7 +179,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     }
 
     if ((error as { statusCode?: number }).statusCode === 400) {
-      return sendApiError(reply, 400, "invalid_request", "Request body is invalid");
+      return sendApiError(
+        reply,
+        400,
+        "invalid_request",
+        "Request body is invalid",
+      );
     }
 
     app.log.error(error);

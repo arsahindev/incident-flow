@@ -5,9 +5,13 @@ export interface RealtimeMetrics {
   connectionClosed(): void;
   authenticationRejected(): void;
   roomJoined(roomType: "organization" | "incident" | "user"): void;
-  roomRejected(reason: "invalid_request" | "permission_denied" | "room_limit"): void;
+  roomRejected(
+    reason: "invalid_request" | "permission_denied" | "room_limit",
+  ): void;
   signalPublished(type: RealtimeIncidentSignal["type"]): void;
-  signalDropped(reason: "invalid_payload" | "payload_too_large" | "backpressure"): void;
+  signalDropped(
+    reason: "invalid_payload" | "payload_too_large" | "backpressure",
+  ): void;
   sessionDisconnected(): void;
 }
 
@@ -28,7 +32,10 @@ export type RealtimeMetricsSnapshot = {
   closedConnections: number;
   rejectedAuthentications: number;
   joinedRooms: Record<"organization" | "incident" | "user", number>;
-  rejectedRooms: Record<"invalid_request" | "permission_denied" | "room_limit", number>;
+  rejectedRooms: Record<
+    "invalid_request" | "permission_denied" | "room_limit",
+    number
+  >;
   publishedSignals: number;
   droppedSignals: Record<
     "invalid_payload" | "payload_too_large" | "backpressure",
@@ -64,7 +71,10 @@ export class InMemoryRealtimeMetrics implements RealtimeMetrics {
   }
 
   connectionClosed() {
-    this.state.activeConnections = Math.max(0, this.state.activeConnections - 1);
+    this.state.activeConnections = Math.max(
+      0,
+      this.state.activeConnections - 1,
+    );
     this.state.closedConnections += 1;
   }
 
@@ -84,7 +94,9 @@ export class InMemoryRealtimeMetrics implements RealtimeMetrics {
     this.state.publishedSignals += 1;
   }
 
-  signalDropped(reason: "invalid_payload" | "payload_too_large" | "backpressure") {
+  signalDropped(
+    reason: "invalid_payload" | "payload_too_large" | "backpressure",
+  ) {
     this.state.droppedSignals[reason] += 1;
   }
 

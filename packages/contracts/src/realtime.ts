@@ -1,8 +1,14 @@
 import { z } from "zod";
 
-export const socketConnectionStatuses = ["connecting", "connected", "disconnected"] as const;
+export const socketConnectionStatuses = [
+  "connecting",
+  "connected",
+  "disconnected",
+] as const;
 export const socketConnectionStatusSchema = z.enum(socketConnectionStatuses);
-export type SocketConnectionStatus = z.infer<typeof socketConnectionStatusSchema>;
+export type SocketConnectionStatus = z.infer<
+  typeof socketConnectionStatusSchema
+>;
 
 export const realtimeIncidentSignalTypes = [
   "incident.created",
@@ -11,9 +17,12 @@ export const realtimeIncidentSignalTypes = [
   "incident.affected_services_changed",
   "incident.activity_updated",
 ] as const;
-export const realtimeIncidentSignalTypeSchema = z.enum(realtimeIncidentSignalTypes);
-export type RealtimeIncidentSignalType = z.infer<typeof realtimeIncidentSignalTypeSchema>;
-
+export const realtimeIncidentSignalTypeSchema = z.enum(
+  realtimeIncidentSignalTypes,
+);
+export type RealtimeIncidentSignalType = z.infer<
+  typeof realtimeIncidentSignalTypeSchema
+>;
 
 export const realtimeIncidentSignalSchema = z.object({
   schemaVersion: z.literal(1),
@@ -22,7 +31,9 @@ export const realtimeIncidentSignalSchema = z.object({
   incidentVersion: z.number().int().positive(),
   occurredAt: z.iso.datetime(),
 });
-export type RealtimeIncidentSignal = z.infer<typeof realtimeIncidentSignalSchema>;
+export type RealtimeIncidentSignal = z.infer<
+  typeof realtimeIncidentSignalSchema
+>;
 
 export const realtimeJoinIncidentRequestSchema = z
   .object({ incidentId: z.uuid() })

@@ -18,9 +18,9 @@ remote merge/runtime follow-up, main-only policy and a successful main release.
 If still missing, authorized setup requires these **environment secrets** under
 repository Settings → Environments → production:
 
-| Secret | Source |
-| --- | --- |
-| VERCEL_TOKEN | Vercel CI access token scoped to arscodings-projects |
+| Secret                  | Source                                                                                    |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| VERCEL_TOKEN            | Vercel CI access token scoped to arscodings-projects                                      |
 | PRODUCTION_DATABASE_URL | Direct DATABASE_URL from ignored .deployment/neon-production.env, not DATABASE_URL_POOLED |
 
 Last recorded activation status: secret setup and the first main release were

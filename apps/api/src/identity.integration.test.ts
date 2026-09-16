@@ -39,7 +39,8 @@ test(
     const invitedEmail = `viewer-${randomUUID()}@example.com`;
     const invitedPassword = "Viewer-Integration-2026!";
     const disconnectedSessions: string[] = [];
-    const disconnectedUsers: Array<{ organizationId: string; userId: string }> = [];
+    const disconnectedUsers: Array<{ organizationId: string; userId: string }> =
+      [];
     const app = buildApp({
       authService: new PrismaAuthService(prisma, passwordPepper),
       incidentRepository: new PrismaIncidentRepository(prisma),
@@ -61,7 +62,11 @@ test(
     try {
       await prisma.organization.createMany({
         data: [
-          { id: organizationId, name: "Identity tenant", slug: organizationSlug },
+          {
+            id: organizationId,
+            name: "Identity tenant",
+            slug: organizationSlug,
+          },
           {
             id: otherOrganizationId,
             name: "Other identity tenant",
@@ -85,7 +90,12 @@ test(
         },
       });
       await prisma.team.create({
-        data: { id: teamId, organizationId, name: "Response", slug: "response" },
+        data: {
+          id: teamId,
+          organizationId,
+          name: "Response",
+          slug: "response",
+        },
       });
       await prisma.service.create({
         data: {
@@ -112,7 +122,8 @@ test(
       });
       assert.equal(login.statusCode, 200);
       assert.match(
-        (await prisma.user.findUniqueOrThrow({ where: { id: ownerId } })).passwordHash,
+        (await prisma.user.findUniqueOrThrow({ where: { id: ownerId } }))
+          .passwordHash,
         /^argon2id-pepper-v1:/,
       );
       const ownerToken = login.json().session.token as string;
@@ -147,7 +158,9 @@ test(
       const incidentId = createdIncident.json().incident.id as string;
       assert.equal(createdIncident.json().incident.version, 1);
       assert.equal(
-        await prisma.incidentActivity.count({ where: { incidentId, actorUserId: ownerId } }),
+        await prisma.incidentActivity.count({
+          where: { incidentId, actorUserId: ownerId },
+        }),
         3,
       );
 
@@ -176,7 +189,8 @@ test(
         payload: { email: invitedEmail, role: "viewer" },
       });
       assert.equal(invitationResponse.statusCode, 201);
-      const invitationToken = invitationResponse.json().invitation.token as string;
+      const invitationToken = invitationResponse.json().invitation
+        .token as string;
 
       const acceptance = await app.inject({
         method: "POST",
@@ -232,7 +246,9 @@ test(
         payload: { status: "suspended" },
       });
       assert.equal(suspendViewer.statusCode, 200);
-      assert.deepEqual(disconnectedUsers, [{ organizationId, userId: viewerId }]);
+      assert.deepEqual(disconnectedUsers, [
+        { organizationId, userId: viewerId },
+      ]);
       const suspendedSession = await app.inject({
         method: "GET",
         url: "/v1/auth/session",
@@ -242,12 +258,20 @@ test(
 
       assert.ok(
         await prisma.auditLog.count({
-          where: { organizationId, actorUserId: ownerId, action: "member.invited" },
+          where: {
+            organizationId,
+            actorUserId: ownerId,
+            action: "member.invited",
+          },
         }),
       );
 
       await prisma.organizationMembership.create({
-        data: { organizationId: otherOrganizationId, userId: ownerId, role: "OWNER" },
+        data: {
+          organizationId: otherOrganizationId,
+          userId: ownerId,
+          role: "OWNER",
+        },
       });
       const organizationAccess = await app.inject({
         method: "GET",
@@ -268,7 +292,10 @@ test(
       ]);
       const rotatedOwnerToken = switched.json().session.token as string;
       assert.notEqual(rotatedOwnerToken, ownerToken);
-      assert.equal(switched.json().session.context.organizationId, otherOrganizationId);
+      assert.equal(
+        switched.json().session.context.organizationId,
+        otherOrganizationId,
+      );
 
       const revokedByRotation = await app.inject({
         method: "GET",
@@ -277,7 +304,10 @@ test(
       });
       assert.equal(revokedByRotation.statusCode, 401);
 
-      await prisma.user.update({ where: { id: ownerId }, data: { status: "DISABLED" } });
+      await prisma.user.update({
+        where: { id: ownerId },
+        data: { status: "DISABLED" },
+      });
       const disabledSession = await app.inject({
         method: "GET",
         url: "/v1/auth/session",
@@ -289,7 +319,9 @@ test(
       await prisma.organization.deleteMany({
         where: { id: { in: [organizationId, otherOrganizationId] } },
       });
-      await prisma.user.deleteMany({ where: { email: { in: [ownerEmail, invitedEmail] } } });
+      await prisma.user.deleteMany({
+        where: { email: { in: [ownerEmail, invitedEmail] } },
+      });
       await prisma.$disconnect();
     }
   },

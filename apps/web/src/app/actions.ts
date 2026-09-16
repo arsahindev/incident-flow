@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { ApiError, requestApi } from "@/lib/api";
-import type { IncidentDetail, ServiceDetail, ServiceEnvironment } from "@/lib/types";
+import type {
+  IncidentDetail,
+  ServiceDetail,
+  ServiceEnvironment,
+} from "@/lib/types";
 
 import type { IncidentFormState } from "./form-state";
 
@@ -17,12 +21,15 @@ function formValue(formData: FormData, key: string) {
 function formValues(formData: FormData, key: string) {
   return formData
     .getAll(key)
-    .filter((value): value is string => typeof value === "string" && value.length > 0);
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
 }
 
 function errorState(error: unknown): IncidentFormState {
   return {
-    error: error instanceof ApiError ? error.message : "Unable to save the incident",
+    error:
+      error instanceof ApiError ? error.message : "Unable to save the incident",
     message: null,
   };
 }
@@ -100,27 +107,35 @@ export async function createServiceAction(
   const environmentKinds = formValues(formData, "environments");
   let serviceId: string;
   try {
-    const response = await requestApi<{ service: ServiceDetail }>("/v1/services", {
-      method: "POST",
-      body: JSON.stringify({
-        name: formValue(formData, "name"),
-        slug: slugify(formValue(formData, "slug") || formValue(formData, "name")),
-        description: formValue(formData, "description") || null,
-        type: formValue(formData, "type"),
-        tier: formValue(formData, "tier"),
-        ownerTeamId: formValue(formData, "ownerTeamId") || null,
-        environments: environmentKinds.map((kind) => ({
-          name: kind[0]!.toUpperCase() + kind.slice(1),
-          slug: kind,
-          kind,
-          isEphemeral: false,
-        })),
-      }),
-    });
+    const response = await requestApi<{ service: ServiceDetail }>(
+      "/v1/services",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name: formValue(formData, "name"),
+          slug: slugify(
+            formValue(formData, "slug") || formValue(formData, "name"),
+          ),
+          description: formValue(formData, "description") || null,
+          type: formValue(formData, "type"),
+          tier: formValue(formData, "tier"),
+          ownerTeamId: formValue(formData, "ownerTeamId") || null,
+          environments: environmentKinds.map((kind) => ({
+            name: kind[0]!.toUpperCase() + kind.slice(1),
+            slug: kind,
+            kind,
+            isEphemeral: false,
+          })),
+        }),
+      },
+    );
     serviceId = response.service.id;
   } catch (error) {
     return {
-      error: error instanceof ApiError ? error.message : "Unable to create the service",
+      error:
+        error instanceof ApiError
+          ? error.message
+          : "Unable to create the service",
       message: null,
     };
   }
@@ -147,16 +162,19 @@ export async function createServiceEnvironmentAction(
           slug: slugify(formValue(formData, "slug") || name),
           kind: formValue(formData, "kind"),
           isEphemeral,
-          expiresAt: isEphemeral && formValue(formData, "expiresAt")
-            ? new Date(formValue(formData, "expiresAt")).toISOString()
-            : null,
+          expiresAt:
+            isEphemeral && formValue(formData, "expiresAt")
+              ? new Date(formValue(formData, "expiresAt")).toISOString()
+              : null,
         }),
       },
     );
   } catch (error) {
     return {
       error:
-        error instanceof ApiError ? error.message : "Unable to create the environment",
+        error instanceof ApiError
+          ? error.message
+          : "Unable to create the environment",
       message: null,
     };
   }
@@ -194,7 +212,10 @@ export async function updateServiceAction(
     });
   } catch (error) {
     return {
-      error: error instanceof ApiError ? error.message : "Unable to update the service",
+      error:
+        error instanceof ApiError
+          ? error.message
+          : "Unable to update the service",
       message: null,
     };
   }

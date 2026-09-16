@@ -65,8 +65,9 @@ export async function requestApi<T>(
 
 export async function getOptionalSession() {
   try {
-    return (await requestApi("/v1/auth/session", undefined, authSessionResponseSchema))
-      .session;
+    return (
+      await requestApi("/v1/auth/session", undefined, authSessionResponseSchema)
+    ).session;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;
@@ -103,13 +104,15 @@ export async function getTeams() {
   return requestApi<{ teams: Team[] }>("/v1/teams");
 }
 
-export async function getIncidents(filters: {
-  serviceId?: string;
-  teamId?: string;
-  status?: IncidentStatus;
-  priority?: IncidentPriority;
-  page?: number;
-} = {}) {
+export async function getIncidents(
+  filters: {
+    serviceId?: string;
+    teamId?: string;
+    status?: IncidentStatus;
+    priority?: IncidentPriority;
+    page?: number;
+  } = {},
+) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "") search.set(key, String(value));

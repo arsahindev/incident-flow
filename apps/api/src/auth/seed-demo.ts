@@ -16,14 +16,25 @@ export async function seedDemoAccount(
       where: { email: account.email },
       include: { organizationMemberships: true },
     });
-    if (existing && (existing.id !== account.id || existing.organizationMemberships.some(
-      (membership) => membership.role === "OWNER" || membership.role === "ADMIN",
-    ))) {
-      throw new Error("Public demo seed refuses to overwrite an existing or privileged account");
+    if (
+      existing &&
+      (existing.id !== account.id ||
+        existing.organizationMemberships.some(
+          (membership) =>
+            membership.role === "OWNER" || membership.role === "ADMIN",
+        ))
+    ) {
+      throw new Error(
+        "Public demo seed refuses to overwrite an existing or privileged account",
+      );
     }
     const user = await tx.user.upsert({
       where: { email: account.email },
-      update: { displayName: account.displayName, passwordHash, status: "ACTIVE" },
+      update: {
+        displayName: account.displayName,
+        passwordHash,
+        status: "ACTIVE",
+      },
       create: {
         id: account.id,
         email: account.email,
@@ -37,7 +48,13 @@ export async function seedDemoAccount(
       create: { organizationId, userId: user.id, role: "RESPONDER" },
     });
     await tx.teamMembership.upsert({
-      where: { organizationId_teamId_userId: { organizationId, teamId, userId: user.id } },
+      where: {
+        organizationId_teamId_userId: {
+          organizationId,
+          teamId,
+          userId: user.id,
+        },
+      },
       update: {},
       create: { organizationId, teamId, userId: user.id },
     });

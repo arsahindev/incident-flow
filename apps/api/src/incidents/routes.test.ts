@@ -203,7 +203,11 @@ test("PATCH /v1/incidents/:id accepts lifecycle changes and maps missing records
     async updateIncident(_organizationSlug, _incidentId, input) {
       receivedInput = input;
       return {
-        incident: { ...incidentFixture(), status: input.status ?? "open", version: 2 },
+        incident: {
+          ...incidentFixture(),
+          status: input.status ?? "open",
+          version: 2,
+        },
         changes: ["status", "activity"],
       };
     },

@@ -17,17 +17,17 @@ require at least one affected service; older development incidents may remain
 unclassified rather than receive invented history. Service ownership and incident
 coordination remain distinct. Account recovery and webhook intake are not implemented.
 
-| Concern | Current implementation and rationale |
-| --- | --- |
-| Workspace | pnpm 11.20.0, Node 24.x; workspace scripts suffice without Turborepo |
-| Web | Next.js 16, TypeScript, Tailwind; familiar modern frontend stack |
-| API | Fastify 5, TypeScript, Zod; explicit HTTP and application boundaries |
-| Database | PostgreSQL with Prisma 7/pg adapter; local Docker, hosted Neon |
-| HTTP client | Native fetch and tested response parser; no general HTTP-client abstraction |
-| Local realtime | Socket.IO, practical rooms and reconnects, single-process state |
-| Hosted realtime | Ably adapter behind the same application ports |
-| Hosting | Two Vercel projects for one production environment; see the hosting runbook |
-| CI | GitHub Actions quality job and main-only production job; activation needs external evidence |
+| Concern         | Current implementation and rationale                                                        |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| Workspace       | pnpm 11.20.0, Node 24.x; workspace scripts suffice without Turborepo                        |
+| Web             | Next.js 16, TypeScript, Tailwind; familiar modern frontend stack                            |
+| API             | Fastify 5, TypeScript, Zod; explicit HTTP and application boundaries                        |
+| Database        | PostgreSQL with Prisma 7/pg adapter; local Docker, hosted Neon                              |
+| HTTP client     | Native fetch and tested response parser; no general HTTP-client abstraction                 |
+| Local realtime  | Socket.IO, practical rooms and reconnects, single-process state                             |
+| Hosted realtime | Ably adapter behind the same application ports                                              |
+| Hosting         | Two Vercel projects for one production environment; see the hosting runbook                 |
+| CI              | GitHub Actions quality job and main-only production job; activation needs external evidence |
 
 The schema currently contains users, organizations, teams, memberships, sessions,
 invitations, login throttles, audit logs, services/environments, incidents,
@@ -71,7 +71,7 @@ interface RealtimePublisher {
   publishIncidentSignal(
     organizationId: string,
     incidentId: string,
-    signal: RealtimeIncidentSignal
+    signal: RealtimeIncidentSignal,
   ): Promise<void>;
 }
 ```

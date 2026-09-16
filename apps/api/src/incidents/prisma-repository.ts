@@ -91,7 +91,8 @@ function toSummary(incident: PrismaIncidentSummary): IncidentSummaryRecord {
       slug: affected.service.slug,
       type: affected.service.type.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["type"],
       tier: affected.service.tier.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["tier"],
-      status: affected.service.status.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["status"],
+      status:
+        affected.service.status.toLowerCase() as IncidentSummaryRecord["affectedServices"][number]["status"],
       isPrimary: affected.isPrimary,
     })),
     version: incident.version,
@@ -132,7 +133,9 @@ export class PrismaIncidentRepository implements IncidentRepository {
       organization: { slug: organizationSlug },
       teamId: filters.teamId,
       status: filters.status ? statusToPrisma[filters.status] : undefined,
-      priority: filters.priority ? priorityToPrisma[filters.priority] : undefined,
+      priority: filters.priority
+        ? priorityToPrisma[filters.priority]
+        : undefined,
       affectedServices: filters.serviceId
         ? { some: { serviceId: filters.serviceId } }
         : undefined,
@@ -312,7 +315,8 @@ export class PrismaIncidentRepository implements IncidentRepository {
       const mutationChanges: IncidentMutationChange[] = [];
 
       const currentStatus = fromPrismaStatus(existing.status);
-      const statusChanged = input.status !== undefined && input.status !== currentStatus;
+      const statusChanged =
+        input.status !== undefined && input.status !== currentStatus;
       if (statusChanged && input.status) {
         mutationChanges.push("status");
         activity.push({
@@ -326,7 +330,8 @@ export class PrismaIncidentRepository implements IncidentRepository {
         });
       }
 
-      const requestedTeamId = input.teamId === undefined ? existing.teamId : input.teamId;
+      const requestedTeamId =
+        input.teamId === undefined ? existing.teamId : input.teamId;
       if (input.teamId !== undefined && requestedTeamId !== existing.teamId) {
         mutationChanges.push("assignment");
         activity.push({
@@ -334,7 +339,9 @@ export class PrismaIncidentRepository implements IncidentRepository {
           incidentId,
           actorUserId,
           type: "TEAM_ASSIGNED",
-          message: nextTeam ? `Assigned to ${nextTeam.name}` : "Team assignment removed",
+          message: nextTeam
+            ? `Assigned to ${nextTeam.name}`
+            : "Team assignment removed",
           fromValue: existing.teamId,
           toValue: requestedTeamId ?? null,
         });
@@ -382,7 +389,9 @@ export class PrismaIncidentRepository implements IncidentRepository {
             type: "AFFECTED_SERVICES_CHANGED",
             message: `Affected services changed to ${nextServices
               .map((service) => service.name)
-              .join(", ")}; primary: ${nextServices.find((service) => service.id === nextPrimaryId)?.name}`,
+              .join(
+                ", ",
+              )}; primary: ${nextServices.find((service) => service.id === nextPrimaryId)?.name}`,
             fromValue: JSON.stringify(currentServiceIds),
             toValue: JSON.stringify(nextServiceIds),
           });
@@ -418,7 +427,9 @@ export class PrismaIncidentRepository implements IncidentRepository {
             action: "incident.updated",
             entityType: "incident",
             entityId: incidentId,
-            metadata: JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue,
+            metadata: JSON.parse(
+              JSON.stringify(input),
+            ) as Prisma.InputJsonValue,
           },
         });
       }
@@ -450,7 +461,9 @@ export class PrismaIncidentRepository implements IncidentRepository {
     if (services.length !== uniqueServiceIds.length) {
       throw new ResourceNotFoundError("Affected service");
     }
-    const serviceById = new Map(services.map((service) => [service.id, service]));
+    const serviceById = new Map(
+      services.map((service) => [service.id, service]),
+    );
     return uniqueServiceIds.map((id) => serviceById.get(id)!);
   }
 }

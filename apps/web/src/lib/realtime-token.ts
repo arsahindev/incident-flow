@@ -11,8 +11,13 @@ export async function realtimeTokenResponse(issue: () => Promise<unknown>) {
   try {
     return Response.json(realtimeTokenSchema.parse(await issue()), { headers });
   } catch (error) {
-    const status = error instanceof ApiError && [401, 403].includes(error.status)
-      ? error.status : 503;
-    return Response.json({ error: "Live updates unavailable" }, { status, headers });
+    const status =
+      error instanceof ApiError && [401, 403].includes(error.status)
+        ? error.status
+        : 503;
+    return Response.json(
+      { error: "Live updates unavailable" },
+      { status, headers },
+    );
   }
 }

@@ -1,14 +1,18 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+
 import { publicDemoAccount } from "@incidentflow/contracts";
+import { PrismaClient } from "../src/generated/prisma/client.js";
 
 import { hashPassword } from "../src/auth/passwords.js";
 import { seedDemoAccount } from "../src/auth/seed-demo.js";
-import { loadSeedConfig } from "../src/config.js";
-import { PrismaClient } from "../src/generated/prisma/client.js";
 import { seedDemoIncidents } from "../src/seed-demo-incidents.js";
+import { loadSeedConfig } from "../src/config.js";
 
-const { DATABASE_URL: databaseUrl, PASSWORD_PEPPER: passwordPepper, PUBLIC_DEMO_ENVIRONMENT: demoEnvironment } =
-  loadSeedConfig();
+const {
+  DATABASE_URL: databaseUrl,
+  PASSWORD_PEPPER: passwordPepper,
+  PUBLIC_DEMO_ENVIRONMENT: demoEnvironment,
+} = loadSeedConfig();
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
@@ -20,13 +24,18 @@ function optionalEnvironmentValue(name: string) {
 const seedEmail = optionalEnvironmentValue("SEED_OWNER_EMAIL");
 const seedPassword = optionalEnvironmentValue("SEED_OWNER_PASSWORD");
 if ((seedEmail === undefined) !== (seedPassword === undefined)) {
-  throw new Error("SEED_OWNER_EMAIL and SEED_OWNER_PASSWORD must be configured together");
+  throw new Error(
+    "SEED_OWNER_EMAIL and SEED_OWNER_PASSWORD must be configured together",
+  );
 }
 
 const developmentOrganization = {
   id: "11111111-1111-4111-8111-111111111111",
-  name: optionalEnvironmentValue("SEED_ORGANIZATION_NAME") ?? "IncidentFlow Development",
-  slug: optionalEnvironmentValue("SEED_ORGANIZATION_SLUG") ?? "incidentflow-dev",
+  name:
+    optionalEnvironmentValue("SEED_ORGANIZATION_NAME") ??
+    "IncidentFlow Development",
+  slug:
+    optionalEnvironmentValue("SEED_ORGANIZATION_SLUG") ?? "incidentflow-dev",
 };
 
 const platformTeam = {
@@ -111,7 +120,10 @@ async function main() {
     },
   });
 
-  const passwordHash = await hashPassword(developmentOwner.password, passwordPepper);
+  const passwordHash = await hashPassword(
+    developmentOwner.password,
+    passwordPepper,
+  );
   const owner = await prisma.user.upsert({
     where: { email: developmentOwner.email },
     update: {
@@ -128,7 +140,10 @@ async function main() {
   });
   await prisma.organizationMembership.upsert({
     where: {
-      organizationId_userId: { organizationId: organization.id, userId: owner.id },
+      organizationId_userId: {
+        organizationId: organization.id,
+        userId: owner.id,
+      },
     },
     update: { role: "OWNER", status: "ACTIVE" },
     create: {
@@ -154,7 +169,13 @@ async function main() {
   });
 
   if (demoEnvironment) {
-    await seedDemoAccount(prisma, publicDemoAccount(demoEnvironment), organization.id, team.id, passwordPepper);
+    await seedDemoAccount(
+      prisma,
+      publicDemoAccount(demoEnvironment),
+      organization.id,
+      team.id,
+      passwordPepper,
+    );
   }
 
   for (const [serviceIndex, serviceDefinition] of services.entries()) {
@@ -178,7 +199,10 @@ async function main() {
       },
     });
 
-    for (const [environmentIndex, environmentName] of serviceDefinition.environments.entries()) {
+    for (const [
+      environmentIndex,
+      environmentName,
+    ] of serviceDefinition.environments.entries()) {
       await prisma.serviceEnvironment.upsert({
         where: {
           organizationId_serviceId_slug: {
@@ -200,7 +224,12 @@ async function main() {
     }
   }
   if (demoEnvironment) {
-    await seedDemoIncidents(prisma, organization.id, team.id, publicDemoAccount(demoEnvironment).id);
+    await seedDemoIncidents(
+      prisma,
+      organization.id,
+      team.id,
+      publicDemoAccount(demoEnvironment).id,
+    );
   }
 }
 

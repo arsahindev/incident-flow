@@ -14,17 +14,20 @@ import { z } from "zod";
 import type { AuthService } from "../auth/service.js";
 import type { RealtimeMetrics } from "./metrics.js";
 import { NoopRealtimeMetrics } from "./metrics.js";
-import type {
-  RealtimePublisher,
-  RealtimeSessionRevoker,
-} from "./publisher.js";
+import type { RealtimePublisher, RealtimeSessionRevoker } from "./publisher.js";
 import type { RealtimeRoomAuthorizer } from "./room-authorizer.js";
 
 type JoinIncidentAck = (result: RealtimeJoinIncidentResult) => void;
 
 type ClientToServerEvents = {
-  "realtime:join-incident": (payload: unknown, acknowledge?: JoinIncidentAck) => void;
-  "realtime:leave-incident": (payload: unknown, acknowledge?: JoinIncidentAck) => void;
+  "realtime:join-incident": (
+    payload: unknown,
+    acknowledge?: JoinIncidentAck,
+  ) => void;
+  "realtime:leave-incident": (
+    payload: unknown,
+    acknowledge?: JoinIncidentAck,
+  ) => void;
 };
 
 type ServerToClientEvents = {
@@ -99,7 +102,9 @@ function authenticationError() {
 
 function pendingPacketCount(socket: RealtimeSocket) {
   const connection = socket.conn as unknown as { writeBuffer?: unknown[] };
-  return Array.isArray(connection.writeBuffer) ? connection.writeBuffer.length : 0;
+  return Array.isArray(connection.writeBuffer)
+    ? connection.writeBuffer.length
+    : 0;
 }
 
 export class SocketIoRealtimeAdapter
@@ -122,7 +127,8 @@ export class SocketIoRealtimeAdapter
 
   constructor(private readonly options: SocketIoRealtimeAdapterOptions) {
     this.metrics = options.metrics ?? new NoopRealtimeMetrics();
-    this.sessionCookieName = options.sessionCookieName ?? "incidentflow_session";
+    this.sessionCookieName =
+      options.sessionCookieName ?? "incidentflow_session";
     this.maxOutboundPayloadBytes = options.maxOutboundPayloadBytes ?? 1_024;
     this.maxIncidentRoomsPerSocket = options.maxIncidentRoomsPerSocket ?? 10;
     this.maxPendingPackets = options.maxPendingPackets ?? 20;
@@ -140,7 +146,10 @@ export class SocketIoRealtimeAdapter
     });
 
     this.io.use(async (socket, next) => {
-      const token = readCookie(socket.request.headers.cookie, this.sessionCookieName);
+      const token = readCookie(
+        socket.request.headers.cookie,
+        this.sessionCookieName,
+      );
       if (!token) {
         this.metrics.authenticationRejected();
         next(authenticationError());
@@ -194,13 +203,19 @@ export class SocketIoRealtimeAdapter
       this.metrics.signalDropped("invalid_payload");
       throw new Error("Realtime publication is invalid");
     }
-    if (Buffer.byteLength(JSON.stringify(parsed.data), "utf8") > this.maxOutboundPayloadBytes) {
+    if (
+      Buffer.byteLength(JSON.stringify(parsed.data), "utf8") >
+      this.maxOutboundPayloadBytes
+    ) {
       this.metrics.signalDropped("payload_too_large");
       throw new Error("Realtime publication exceeds the payload limit");
     }
 
     const socketIds = new Set<string>();
-    for (const room of [organizationRoom(organizationId), incidentRoom(incidentId)]) {
+    for (const room of [
+      organizationRoom(organizationId),
+      incidentRoom(incidentId),
+    ]) {
       for (const socketId of this.io.sockets.adapter.rooms.get(room) ?? []) {
         socketIds.add(socketId);
       }
@@ -208,7 +223,8 @@ export class SocketIoRealtimeAdapter
 
     for (const socketId of socketIds) {
       const socket = this.io.sockets.sockets.get(socketId);
-      if (!socket || socket.data.auth.organizationId !== organizationId) continue;
+      if (!socket || socket.data.auth.organizationId !== organizationId)
+        continue;
       if (
         !socket.conn.transport.writable ||
         pendingPacketCount(socket) >= this.maxPendingPackets
@@ -250,11 +266,15 @@ export class SocketIoRealtimeAdapter
 
   private handleConnection(socket: RealtimeSocket) {
     const { auth } = socket.data;
-    const sessionSockets = this.socketsBySession.get(auth.sessionId) ?? new Set();
+    const sessionSockets =
+      this.socketsBySession.get(auth.sessionId) ?? new Set();
     sessionSockets.add(socket.id);
     this.socketsBySession.set(auth.sessionId, sessionSockets);
 
-    void socket.join([organizationRoom(auth.organizationId), userRoom(auth.userId)]);
+    void socket.join([
+      organizationRoom(auth.organizationId),
+      userRoom(auth.userId),
+    ]);
     this.metrics.connectionOpened();
     this.metrics.roomJoined("organization");
     this.metrics.roomJoined("user");

@@ -30,7 +30,11 @@ export function LoginForm() {
           className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5"
         />
       </label>
-      {state.error ? <p role="alert" className="text-sm text-red-300">{state.error}</p> : null}
+      {state.error ? (
+        <p role="alert" className="text-sm text-red-300">
+          {state.error}
+        </p>
+      ) : null}
       <button
         disabled={pending}
         className="w-full rounded-lg bg-cyan-400 px-4 py-2.5 font-semibold text-slate-950 disabled:opacity-60"

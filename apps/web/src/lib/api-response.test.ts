@@ -17,7 +17,10 @@ test("parses a successful JSON response exactly once and validates it", async ()
 });
 
 test("returns undefined for a no-content response", async () => {
-  assert.equal(await parseApiResponse(new Response(null, { status: 204 })), undefined);
+  assert.equal(
+    await parseApiResponse(new Response(null, { status: 204 })),
+    undefined,
+  );
 });
 
 test("preserves structured API error metadata", async () => {
@@ -28,7 +31,13 @@ test("preserves structured API error metadata", async () => {
           error: {
             code: "validation_error",
             message: "Validation failed",
-            issues: [{ path: "email", message: "Invalid email", code: "invalid_format" }],
+            issues: [
+              {
+                path: "email",
+                message: "Invalid email",
+                code: "invalid_format",
+              },
+            ],
             requestId: "request-error",
           },
         }),
@@ -49,11 +58,13 @@ test("preserves structured API error metadata", async () => {
 test("turns non-JSON failures and malformed successful bodies into safe errors", async () => {
   await assert.rejects(
     parseApiResponse(new Response("gateway unavailable", { status: 502 })),
-    (error: unknown) => error instanceof ApiError && error.code === "unknown_error",
+    (error: unknown) =>
+      error instanceof ApiError && error.code === "unknown_error",
   );
   await assert.rejects(
     parseApiResponse(new Response("not-json", { status: 200 })),
-    (error: unknown) => error instanceof ApiError && error.code === "invalid_response",
+    (error: unknown) =>
+      error instanceof ApiError && error.code === "invalid_response",
   );
 });
 

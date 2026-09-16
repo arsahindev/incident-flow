@@ -53,13 +53,19 @@ export function RealtimeIncidentRefresh({
     if (clientEnvironment.NEXT_PUBLIC_REALTIME_URL === "ably") {
       let disposed = false;
       let close: (() => void) | undefined;
-      void import("@/lib/ably-realtime").then(({ connectAblyRealtime }) => {
-        if (disposed) return;
-        close = connectAblyRealtime({
-          status: setStatus, signal: receiveSignal,
-          refetch: scheduleCanonicalRefetch, authenticationRequired,
+      void import("@/lib/ably-realtime")
+        .then(({ connectAblyRealtime }) => {
+          if (disposed) return;
+          close = connectAblyRealtime({
+            status: setStatus,
+            signal: receiveSignal,
+            refetch: scheduleCanonicalRefetch,
+            authenticationRequired,
+          });
+        })
+        .catch(() => {
+          if (!disposed) setStatus("disconnected");
         });
-      }).catch(() => { if (!disposed) setStatus("disconnected"); });
       return () => {
         disposed = true;
         close?.();
@@ -87,14 +93,17 @@ export function RealtimeIncidentRefresh({
       hasConnected = true;
     });
     socket.on("disconnect", () => setStatus("disconnected"));
-    socket.on("connect_error", (error: Error & { data?: { code?: string } }) => {
-      if (error.data?.code === "authentication_required") {
-        router.replace("/login");
-        router.refresh();
-        return;
-      }
-      setStatus("connecting");
-    });
+    socket.on(
+      "connect_error",
+      (error: Error & { data?: { code?: string } }) => {
+        if (error.data?.code === "authentication_required") {
+          router.replace("/login");
+          router.refresh();
+          return;
+        }
+        setStatus("connecting");
+      },
+    );
     socket.on("realtime:session-revoked", () => {
       router.replace("/login");
       router.refresh();
