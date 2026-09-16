@@ -37,3 +37,13 @@ without a new cost decision. Local Docker data must survive cloud teardown.
 Production is deployed. The 2026-09-15 token-bridge fix was verified with a live Ably connection; see the deployment guide for exact checks and remaining verification limits.
 
 The production entry point imports only the Ably transport; local Socket.IO selection is isolated from Vercel function packaging.
+
+## CI release follow-up - 2026-09-15
+
+Use GitHub Actions to deploy the existing projects after main passes quality
+checks. Restrict the production environment to main, serialize releases, apply
+backward-compatible migrations without reseeding, and release API before web
+with public HTTP checks. Keep Vercel Git integration disconnected to preserve
+the quality gate. The pair is not an atomic release; API/schema compatibility
+with the preceding web release is required. No automatic database rollback.
+See [activation status and runbook](../github-deployment.md).

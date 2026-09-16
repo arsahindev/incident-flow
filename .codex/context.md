@@ -7,14 +7,18 @@ https://incidentflow-api-prod.vercel.app, Neon Free PostgreSQL and Ably Free.
 The owner requested a prod-only portfolio demo, local development and a $5/month
 ceiling, preferably free. All project AWS resources were deleted. CloudFormation
 and AWS deployment notes below are historical; do not recreate those resources.
-GitHub CI is quality-only. Production updates use Vercel CLI source upload.
+Deployment PR #5 is merged at 2a01b58. The follow-up branch
+`codex/production-auto-deploy` adds production deployment after main passes CI.
+GitHub environment `production` permits only main; its two deployment secrets
+and first real run are pending. See docs/github-deployment.md for activation.
 
 Demo login, data, cross-browser incident updates, API health/readiness and Ably
 logout revocation are verified. See docs/production-verification.md for exact
 checks, docs/free-demo-deployment.md for deployment, and docs/environment-access.md
 for public access and private credential storage. No private secrets belong in Git.
 The owner now explicitly authorized incremental commits for PR preparation;
-push, PR creation and merge remain user-owned. Do not begin Phase3.5 on this branch.
+push, PR creation and merge remain user-owned. Do not begin Phase3.5 on the
+automation branch. Read docs/phase-3-5-handoff.md before starting that phase.
 
 ## Purpose of this document
 
@@ -1154,9 +1158,9 @@ pnpm audit --prod --audit-level high
 
 1. Inspect Git status, branch, recent commits, running services, applicable `AGENTS.md`, and actual schema/code before editing. Preserve unrelated/user changes.
 2. Preserve the Phase 3 `RealtimePublisher`/Socket.IO boundary, server-derived rooms, strict-origin cookie handshake, best-effort signal semantics, and canonical-refetch/version guarantees.
-3. Production deployment on `codex/phase-3-deployment` is complete. Incremental commits and final quality checks are complete; the owner will create the PR. Do not push or merge. Do not recreate AWS or hosted dev.
+3. Deployment PR #5 is merged. Finish activation of the `codex/production-auto-deploy` follow-up: production VERCEL_TOKEN and direct PRODUCTION_DATABASE_URL environment secrets, then owner review/merge and first main CI deployment verification. Do not push or merge. Do not recreate AWS or hosted dev.
 4. The user owns review and merging of deployment changes. Do not begin Phase 3.5 during deployment work.
-5. Begin Phase 3.5 only after the user confirms Phase 3 was merged, local `main` was updated, and the `phase_3_5` branch was created. Implement its account lifecycle/recovery scope incrementally before Phase 4.
+5. Begin Phase 3.5 after the automation follow-up is merged and verified, local `main` is current, and `codex/phase-3-5-account-lifecycle` is created. Follow docs/phase-3-5-handoff.md and implement account lifecycle/recovery incrementally before Phase 4.
 6. Continue migrating endpoint success schemas into `packages/contracts` when their APIs are actively changed; keep the stable coded error contract centralized.
 7. Keep the milestone local and runnable. Do not begin Phase 4 or jump to webhooks, AWS, queues, AI, Kafka, broad notifications, or on-call without explicit user approval.
 8. Keep this context, README, ADRs, and roadmap status synchronized with implemented behavior.
@@ -1189,7 +1193,7 @@ pnpm audit --prod --audit-level high
   idle5s,connect10s), registered with attachDatabasePool. Runtime uses pooled Neon
   URI with verified TLS; migrations use the direct URI. Five migrations applied.
 - Two Vercel projects constitute one prod environment: incidentflow-prod(web)
-  and incidentflow-api-prod(API), Node22, Frankfurt functions, production public.
+  and incidentflow-api-prod(API), Node24, Frankfurt functions, production public.
   Preview deployments disabled. Free quotas and cold starts remain limitations.
 - Private seed/connection values live in ignored .deployment/neon-production.env
   and required runtime values in Vercel production-sensitive environment variables.
@@ -1214,3 +1218,27 @@ remain ignored; public demo passwords and the public RDS CA bundle are deliberat
 Commits group repository guidance, demo seeds, Vercel/Ably hosting, AWS retirement
 and documentation. No push, PR creation, merge or production redeployment was
 performed during PR preparation. No product changes beyond the deployment scope.
+
+## Main-branch deployment automation follow-up
+
+The quality job gates a main-push-only production job. Releases serialize, skip
+already superseded commits, apply committed backward-compatible Prisma migrations
+without seeding, deploy API then web through pinned Vercel CLI59.17.0, and require
+HTTP200 for health/readiness/login. Production remains two existing Vercel projects
+with their existing variables; Vercel Git integration stays disconnected.
+Migration/API/web releases are not atomic: preserve prior-version compatibility,
+fix forward on failures and never automatically reverse schema or reset data.
+GitHub production environment has exactly one branch policy: main. Secret setup
+and first main-run verification remain pending. The next-phase prompt and scope
+are in docs/phase-3-5-handoff.md; no Phase3.5 implementation has begun.
+
+## Node 24 alignment - 2026-09-16
+
+Root/API/web engines now select 24.x; CI deployment selects Node24 and the
+owner's quality-job setup uses node@v24. .nvmrc selects24. Docker build/runtime
+bases use Node24. Both existing Vercel project settings read/update to24.x.
+This setting applies on the next deployment; no production redeployment was run.
+Validation on local Node24.21.0: lint/typecheck/build passed; contracts4, API41,
+web17 and PostgreSQL integration9/9 passed; audit found no known vulnerabilities.
+Actionlint and diff-check passed. User's prior workflow edits were preserved.
+No commit or push during this alignment.

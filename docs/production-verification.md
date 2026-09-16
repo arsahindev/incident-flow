@@ -50,3 +50,26 @@ Normal unit discovery skips those9database cases by design. Dependency audit
 reported no known vulnerabilities. Shell/Node syntax and git diff checks passed.
 An initial sandboxed test run failed to bind local listeners; the permitted
 rerun passed. Private .env/recovery files remain ignored. No push or merge.
+
+## Automatic deployment follow-up - 2026-09-15
+
+Deployment PR #5 is now merged at 2a01b58. The separate automation branch adds
+main-push deployment after the quality job. Validation: actionlint1.7.7 passed,
+all deployment shell blocks passed bash syntax checks, workflow gate/concurrency
+assertions passed, and git diff --check passed. No application/schema changes
+were made, so the earlier application/database results above were not rerun.
+GitHub production environment was created and read back with exactly one branch
+policy, main. Its secret listing is empty: VERCEL_TOKEN and
+PRODUCTION_DATABASE_URL still need configuration. No new production deployment
+or end-to-end Actions run was performed. See github-deployment.md for activation
+and phase-3-5-handoff.md for the next milestone.
+
+## Node 24 alignment - 2026-09-16
+
+Workspace engines, CI deployment and Docker bases now target Node24; .nvmrc
+selects24. Both Vercel project settings are24.x. This changes future deployments,
+not the runtime of an already deployed function. No redeployment was performed.
+On Node24.21.0: lint/typecheck/build passed;4contract,41API,17web unit tests and
+9/9database integration tests passed. Audit: no known vulnerabilities. Actionlint
+and git diff --check passed. The historical Node22 results above remain records
+of the previous release. Docker image build was not rerun.

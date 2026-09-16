@@ -33,14 +33,11 @@ jobs:
       API_URL: http://localhost:4000
       NEXT_PUBLIC_REALTIME_URL: http://localhost:4000
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
         with:
           version: 11.20.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
+          runtime: node@v24
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @incidentflow/api exec prisma migrate deploy
       - run: pnpm lint
@@ -49,3 +46,85 @@ jobs:
       - run: pnpm test:integration
       - run: pnpm build
       - run: pnpm audit --prod --audit-level high
+
+  deploy-production:
+    needs: quality
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://incidentflow-prod.vercel.app
+    concurrency:
+      group: incidentflow-production
+      cancel-in-progress: false
+    env:
+      VERCEL_ORG_ID: team_GxXU8fOOaZn0RH4E5YgeMUII
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip superseded commits before changing production
+        id: current
+        shell: bash
+        run: |
+          latest=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
+          if [[ "$latest" == "$GITHUB_SHA" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+            echo 'Skipped: main has a newer commit.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Check deployment credentials
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          test -n "$VERCEL_TOKEN" || { echo 'Missing production VERCEL_TOKEN'; exit 1; }
+          test -n "$DATABASE_URL" || { echo 'Missing production PRODUCTION_DATABASE_URL'; exit 1; }
+      - uses: pnpm/action-setup@v4
+        if: steps.current.outputs.deploy == 'true'
+        with:
+          version: 11.20.0
+      - uses: actions/setup-node@v4
+        if: steps.current.outputs.deploy == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked workspace dependencies
+        if: steps.current.outputs.deploy == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Apply backward-compatible production migrations
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: pnpm --filter @incidentflow/api exec prisma migrate deploy
+      - name: Deploy API
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: prj_HouRT1lEv7RjA4nfxWHpSCWfSbOb
+        run: npx --yes vercel@59.17.0 deploy --prod --yes --scope arscodings-projects --token "$VERCEL_TOKEN" --meta "githubCommitSha=$GITHUB_SHA"
+      - name: Verify public API
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          for path in health ready; do
+            status=$(curl --fail --silent --show-error --retry 6 --retry-all-errors --retry-delay 5 --max-time 20 --output /dev/null --write-out "%{http_code}" "https://incidentflow-api-prod.vercel.app/$path")
+            test "$status" = 200 || { echo "$path returned HTTP $status"; exit 1; }
+          done
+      - name: Deploy web
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: prj_ZsTG90AnLfhBb32KWQpCU1otKGTi
+        run: npx --yes vercel@59.17.0 deploy --prod --yes --scope arscodings-projects --token "$VERCEL_TOKEN" --meta "githubCommitSha=$GITHUB_SHA"
+      - name: Verify public login and record release
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          status=$(curl --fail --silent --show-error --retry 6 --retry-all-errors --retry-delay 5 --max-time 20 --output /dev/null --write-out "%{http_code}" https://incidentflow-prod.vercel.app/login)
+          test "$status" = 200 || { echo "login returned HTTP $status"; exit 1; }
+          {
+            echo "Deployed commit: $GITHUB_SHA"
+            echo 'Web: https://incidentflow-prod.vercel.app'
+            echo 'API: https://incidentflow-api-prod.vercel.app'
+            echo 'API health/readiness and web login checks passed.'
+          } >> "$GITHUB_STEP_SUMMARY"
