@@ -63,3 +63,13 @@ policy, main. Its secret listing is empty: VERCEL_TOKEN and
 PRODUCTION_DATABASE_URL still need configuration. No new production deployment
 or end-to-end Actions run was performed. See github-deployment.md for activation
 and phase-3-5-handoff.md for the next milestone.
+
+## Node 24 alignment - 2026-09-16
+
+Workspace engines, CI deployment and Docker bases now target Node24; .nvmrc
+selects24. Both Vercel project settings are24.x. This changes future deployments,
+not the runtime of an already deployed function. No redeployment was performed.
+On Node24.21.0: lint/typecheck/build passed;4contract,41API,17web unit tests and
+9/9database integration tests passed. Audit: no known vulnerabilities. Actionlint
+and git diff --check passed. The historical Node22 results above remain records
+of the previous release. Docker image build was not rerun.

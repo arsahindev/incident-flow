@@ -14,7 +14,7 @@ fit that budget. Do not re-enable the retired AWS deployment scripts.
 | PostgreSQL on Neon Free | incidentflow-prod | Server-only pooled connection |
 | Realtime on Ably Free | IncidentFlow | Scoped token-authenticated channels |
 
-Both app projects target Node22 and Frankfurt functions. They form one prod
+Both app projects target Node24 and Frankfurt functions. They form one prod
 environment, not separate dev/prod deployments. Preview deployments are disabled.
 Production origins are public; application data still requires authentication.
 Free-tier quotas and cold starts apply. Do not enable paid upgrades automatically.

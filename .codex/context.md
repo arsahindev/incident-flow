@@ -1193,7 +1193,7 @@ pnpm audit --prod --audit-level high
   idle5s,connect10s), registered with attachDatabasePool. Runtime uses pooled Neon
   URI with verified TLS; migrations use the direct URI. Five migrations applied.
 - Two Vercel projects constitute one prod environment: incidentflow-prod(web)
-  and incidentflow-api-prod(API), Node22, Frankfurt functions, production public.
+  and incidentflow-api-prod(API), Node24, Frankfurt functions, production public.
   Preview deployments disabled. Free quotas and cold starts remain limitations.
 - Private seed/connection values live in ignored .deployment/neon-production.env
   and required runtime values in Vercel production-sensitive environment variables.
@@ -1231,3 +1231,14 @@ fix forward on failures and never automatically reverse schema or reset data.
 GitHub production environment has exactly one branch policy: main. Secret setup
 and first main-run verification remain pending. The next-phase prompt and scope
 are in docs/phase-3-5-handoff.md; no Phase3.5 implementation has begun.
+
+## Node 24 alignment - 2026-09-16
+
+Root/API/web engines now select 24.x; CI deployment selects Node24 and the
+owner's quality-job setup uses node@v24. .nvmrc selects24. Docker build/runtime
+bases use Node24. Both existing Vercel project settings read/update to24.x.
+This setting applies on the next deployment; no production redeployment was run.
+Validation on local Node24.21.0: lint/typecheck/build passed; contracts4, API41,
+web17 and PostgreSQL integration9/9 passed; audit found no known vulnerabilities.
+Actionlint and diff-check passed. User's prior workflow edits were preserved.
+No commit or push during this alignment.

@@ -164,3 +164,6 @@ incidentflow/
 Phase 3 and its portfolio deployment are complete. The deployment branch was merged in PR #5; automatic deployment is a separate follow-up. Phase 3.5 is planned next for controlled first-owner organization registration, email verification, forgot/reset password, authenticated password changes, explicit short-lived organization-selection challenges for multi-organization login, session/socket revocation, and bounded expired-credential cleanup. Existing-organization registration remains invitation-only. Phase 4 (secure source-integration webhook intake) begins only after Phase 3.5 and has not started.
 
 Architecture decisions are documented in [ADR 0001: server-managed sessions](docs/decisions/0001-server-managed-sessions.md), [ADR 0002: native fetch and API contracts](docs/decisions/0002-native-fetch-and-api-contracts.md), and [ADR 0003: authenticated realtime update signals](docs/decisions/0003-authenticated-realtime-update-signals.md).
+
+Node.js runtime: **24.x** across workspace packages, CI and Vercel. Run
+`nvm install` and `nvm use` from the repository root to use `.nvmrc`.

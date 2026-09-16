@@ -33,14 +33,11 @@ jobs:
       API_URL: http://localhost:4000
       NEXT_PUBLIC_REALTIME_URL: http://localhost:4000
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
         with:
           version: 11.20.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
+          runtime: node@v24
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @incidentflow/api exec prisma migrate deploy
       - run: pnpm lint
@@ -91,7 +88,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.current.outputs.deploy == 'true'
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - name: Install locked workspace dependencies
         if: steps.current.outputs.deploy == 'true'

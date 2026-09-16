@@ -23,7 +23,7 @@ process through ignored `.deployment/vercel-ci.env` as `VERCEL_TOKEN=...`.
 Rotate the GitHub secret when the token expires. Existing API secrets stay in
 Vercel; the workflow does not need the owner password, pepper or Ably key.
 
-Public team/project IDs are pinned in the workflow. Node22, pnpm11.20.0 and
+Public team/project IDs are pinned in the workflow. Node24, pnpm11.20.0 and
 Vercel CLI59.17.0 are used. CLI source uploads build against each project's
 existing production settings and variables, using root directories `apps/api`
 and `apps/web`. `.vercelignore` excludes private local files.
