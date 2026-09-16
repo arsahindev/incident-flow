@@ -1,5 +1,9 @@
 # Portfolio environment access
 
+Read when using demo accounts, understanding seed behavior or locating private
+recovery material. This is the authoritative account/access reference; paths and
+hosted seed state are recorded information, not a new inspection of private files.
+
 | Environment | Login | Public responder email | Public password |
 | --- | --- | --- | --- |
 | Local | http://localhost:3000/login | `demo+local@incidentflow.demo` | `IncidentFlow-Demo-local-2026!` |
@@ -12,10 +16,12 @@ use fictional data only. Seeds create five services and six incidents, preservin
 existing visitor edits on reruns. There is no automatic demo reset.
 
 Set PUBLIC_DEMO_ENVIRONMENT=local in local API and web environment files; run
-pnpm db:seed. Production was seeded with prod and the web project uses prod.
+pnpm db:seed. Production was recorded as seeded with prod and the web project
+configured as prod.
 The shared publicDemoAccount definition keeps seed and displayed credentials
-consistent. Omitting the setting hides the hint and skips demo seeding; it does
-not revoke an existing account. Suspend membership to revoke access.
+consistent. Seeds reject collisions with privileged identities. Omitting the
+setting hides the hint and skips demo seeding; it does not revoke an existing
+account. Suspend membership to revoke access.
 
 ## Private administrator
 
@@ -24,9 +30,10 @@ locally in the ignored `.deployment/neon-production.env` as SEED_OWNER_PASSWORD.
 The same file holds the seed configuration and private connection credentials.
 It is machine-local, not a versioned credential backup. Keep it private and do
 not commit it. The password is not a public demo password or a Vercel browser
-variable. Local owner access remains admin@incidentflow.local with the documented
-local-only seed password in README.
+variable. The local-only owner seed is `admin@incidentflow.local` with password
+`IncidentFlow-Dev-2026!`. These known local credentials must never be deployed
+to a shared environment. They are distinct from the public responder account.
 
-Hosted dev and AWS Secrets Manager credentials were deleted during retirement.
-The dev seed definition remains available, but no dev environment is deployed.
+Hosted dev and AWS credential deletion were recorded during retirement. The dev
+seed definition remains in source; the supported topology has no hosted dev.
 See [production verification](production-verification.md).

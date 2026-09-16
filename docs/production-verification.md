@@ -1,5 +1,12 @@
 # Production deployment verification - 2026-09-15
 
+Dated evidence, with a 2026-09-16 addendum. Read when assessing previous checks
+or troubleshooting their limits. Results below were reported by earlier work;
+this documentation cleanup reran none of them and contacted no services. Current
+cloud settings, credentials, runtime, CI activation and live health need fresh
+evidence during authorized operations. Procedures live in the
+[hosting guide](free-demo-deployment.md) and [release runbook](github-deployment.md).
+
 Production portfolio demo is deployed on Vercel Hobby, Neon Free and Ably Free.
 No hosted dev environment remains; local Docker development/data are preserved.
 
@@ -12,6 +19,8 @@ No hosted dev environment remains; local Docker development/data are preserved.
 
 ## Live results
 
+- Five existing Prisma migrations and the public/private demo seeds were reported
+  applied to Neon; sample data contained five services and six incidents.
 - Public API health, readiness and web login: HTTP200.
 - Authenticated web token endpoint: HTTP200, Cache-Control:no-store.
 - Real Ably connection and organization channel attachment: PASS.
@@ -34,8 +43,8 @@ Vercel Socket.IO packaging diagnostics were resolved by separating local
 transport selection from the production Ably entry point. The replacement API
 build completed without TypeScript diagnostics. Both local transports passed
 startup/health/shutdown checks; the live connection and logout tests passed again.
-Vercel still prints an informational Node setting mismatch; package engines pin
-the actual runtime to Node22.
+At that checkpoint Vercel printed an informational Node setting mismatch and
+package engines selected Node 22. This is historical; see the Node 24 addendum.
 
 Free-plan quotas and cold starts still apply. No paid upgrades, new AWS resources,
 Git commits, pushes or merges were performed. Source deployment used the Vercel
@@ -61,13 +70,13 @@ were made, so the earlier application/database results above were not rerun.
 GitHub production environment was created and read back with exactly one branch
 policy, main. Its secret listing is empty: VERCEL_TOKEN and
 PRODUCTION_DATABASE_URL still need configuration. No new production deployment
-or end-to-end Actions run was performed. See github-deployment.md for activation
-and phase-3-5-handoff.md for the next milestone.
+or end-to-end Actions run was performed. See [the release runbook](github-deployment.md) for activation
+and [the Phase 3.5 handoff](phase-3-5-handoff.md) for the next milestone.
 
 ## Node 24 alignment - 2026-09-16
 
 Workspace engines, CI deployment and Docker bases now target Node24; .nvmrc
-selects24. Both Vercel project settings are24.x. This changes future deployments,
+selects24. Both Vercel project settings were reported as 24.x. This changes future deployments,
 not the runtime of an already deployed function. No redeployment was performed.
 On Node24.21.0: lint/typecheck/build passed;4contract,41API,17web unit tests and
 9/9database integration tests passed. Audit: no known vulnerabilities. Actionlint
