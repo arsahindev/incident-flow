@@ -1,4 +1,8 @@
-import type { IncidentPriority, IncidentStatus, TeamRecord } from "../incidents/types.js";
+import type {
+  IncidentPriority,
+  IncidentStatus,
+  TeamRecord,
+} from "../incidents/types.js";
 
 export const serviceTypes = [
   "application",
@@ -93,12 +97,16 @@ export type CreateServiceInput = {
 };
 
 export type UpdateServiceInput = Partial<
-  Pick<CreateServiceInput, "name" | "slug" | "description" | "type" | "tier" | "ownerTeamId">
+  Pick<
+    CreateServiceInput,
+    "name" | "slug" | "description" | "type" | "tier" | "ownerTeamId"
+  >
 > & {
   status?: ServiceStatus;
   archived?: boolean;
 };
 
-export type UpdateServiceEnvironmentInput = Partial<CreateServiceEnvironmentInput> & {
-  status?: ServiceEnvironmentStatus;
-};
+export type UpdateServiceEnvironmentInput =
+  Partial<CreateServiceEnvironmentInput> & {
+    status?: ServiceEnvironmentStatus;
+  };

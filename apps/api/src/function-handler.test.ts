@@ -12,21 +12,31 @@ test("function reuses one initialized app across concurrent HTTP requests", asyn
     readinessChecks++;
     await new Promise((resolve) => setTimeout(resolve, 10));
   });
-  const handler = createFunctionHandler(() => { constructions++; return app; });
-  const server = createServer((req, res) => { void handler(req, res); });
+  const handler = createFunctionHandler(() => {
+    constructions++;
+    return app;
+  });
+  const server = createServer((req, res) => {
+    void handler(req, res);
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   assert.ok(address && typeof address !== "string");
   const origin = `http://127.0.0.1:${address.port}`;
   try {
-    await Promise.all(Array.from({ length: 8 }, async () => {
-      const response = await fetch(`${origin}/health`);
-      assert.equal(response.status, 200);
-      assert.equal((await response.json()).status, "ok");
-    }));
+    await Promise.all(
+      Array.from({ length: 8 }, async () => {
+        const response = await fetch(`${origin}/health`);
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).status, "ok");
+      }),
+    );
     assert.equal(constructions, 1);
     assert.equal(readinessChecks, 1);
-    assert.equal((await fetch(`${origin}/v1/realtime/token`, { method: "POST" })).status, 401);
+    assert.equal(
+      (await fetch(`${origin}/v1/realtime/token`, { method: "POST" })).status,
+      401,
+    );
     assert.equal(app.server.listening, false);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -41,7 +51,9 @@ test("failed function initialization returns a safe response and retries next re
     if (++attempts === 1) throw new Error("private configuration value");
     return app;
   });
-  const server = createServer((req, res) => { void handler(req, res); });
+  const server = createServer((req, res) => {
+    void handler(req, res);
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   assert.ok(address && typeof address !== "string");

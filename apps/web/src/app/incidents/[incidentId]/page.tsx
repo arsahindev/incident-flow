@@ -2,7 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { ApiError, getIncident, getServices, getTeams, requireSession } from "@/lib/api";
+import {
+  ApiError,
+  getIncident,
+  getServices,
+  getTeams,
+  requireSession,
+} from "@/lib/api";
 
 import { PriorityBadge, StatusBadge } from "../../ui/badges";
 import { IncidentControls } from "../../ui/incident-controls";
@@ -31,9 +37,14 @@ export default async function IncidentPage({
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
-  const [{ teams }, { services }] = await Promise.all([getTeams(), getServices()]);
+  const [{ teams }, { services }] = await Promise.all([
+    getTeams(),
+    getServices(),
+  ]);
   const { incident } = incidentResponse;
-  const primaryService = incident.affectedServices.find((service) => service.isPrimary);
+  const primaryService = incident.affectedServices.find(
+    (service) => service.isPrimary,
+  );
   const additionalServices = incident.affectedServices.filter(
     (service) => !service.isPrimary,
   );
@@ -46,7 +57,9 @@ export default async function IncidentPage({
 
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm text-slate-500">Incident {incident.id.slice(0, 8)}</p>
+          <p className="text-sm text-slate-500">
+            Incident {incident.id.slice(0, 8)}
+          </p>
           <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight">
             {incident.title}
           </h1>
@@ -56,7 +69,9 @@ export default async function IncidentPage({
           </div>
         </div>
         <div className="text-right">
-          <p className="text-sm text-slate-500">Created {formatDate(incident.createdAt)}</p>
+          <p className="text-sm text-slate-500">
+            Created {formatDate(incident.createdAt)}
+          </p>
           <div className="mt-2">
             <RealtimeIncidentRefresh
               incidentId={incident.id}
@@ -86,7 +101,9 @@ export default async function IncidentPage({
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
                     Primary affected service
                   </p>
-                  <p className="mt-1 font-semibold text-slate-50">{primaryService.name}</p>
+                  <p className="mt-1 font-semibold text-slate-50">
+                    {primaryService.name}
+                  </p>
                 </div>
                 <span className="rounded-full bg-cyan-300 px-2.5 py-1 text-xs font-bold text-slate-950">
                   Primary
@@ -100,21 +117,21 @@ export default async function IncidentPage({
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {additionalServices.map((service) => (
-                  <Link
-                    key={service.id}
-                    href={`/services/${service.id}`}
-                    className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200 hover:border-cyan-500/60"
-                  >
-                    {service.name}
-                  </Link>
+                    <Link
+                      key={service.id}
+                      href={`/services/${service.id}`}
+                      className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200 hover:border-cyan-500/60"
+                    >
+                      {service.name}
+                    </Link>
                   ))}
                 </div>
               </div>
             ) : null}
             {incident.affectedServices.length === 0 ? (
               <p className="mt-4 text-sm text-slate-400">
-                This pre-catalog incident has not been classified yet. Select an affected
-                service in the controls to complete it.
+                This pre-catalog incident has not been classified yet. Select an
+                affected service in the controls to complete it.
               </p>
             ) : null}
           </section>
@@ -131,7 +148,9 @@ export default async function IncidentPage({
                     <p className="text-sm text-slate-200">{entry.message}</p>
                     <p className="mt-1 text-xs text-slate-500">
                       {formatDate(entry.createdAt)}
-                      {entry.actor ? ` · ${entry.actor.displayName}` : " · system or legacy action"}
+                      {entry.actor
+                        ? ` · ${entry.actor.displayName}`
+                        : " · system or legacy action"}
                     </p>
                   </div>
                 </li>
@@ -142,24 +161,27 @@ export default async function IncidentPage({
 
         {session.permissions.includes("incidents.manage") ? (
           <aside className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-          <h2 className="font-semibold">Coordinate response</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Update ownership and lifecycle state. Every change is recorded.
-          </p>
-          <div className="mt-6">
-            <IncidentControls
-              key={`${incident.status}:${incident.team?.id ?? "unassigned"}:${incident.affectedServices.map((service) => `${service.id}:${service.isPrimary}`).join(",")}`}
-              incidentId={incident.id}
-              status={incident.status}
-              teamId={incident.team?.id ?? null}
-              teams={teams}
-              services={services}
-              selectedServiceIds={incident.affectedServices.map((service) => service.id)}
-              primaryServiceId={
-                incident.affectedServices.find((service) => service.isPrimary)?.id ?? null
-              }
-            />
-          </div>
+            <h2 className="font-semibold">Coordinate response</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Update ownership and lifecycle state. Every change is recorded.
+            </p>
+            <div className="mt-6">
+              <IncidentControls
+                key={`${incident.status}:${incident.team?.id ?? "unassigned"}:${incident.affectedServices.map((service) => `${service.id}:${service.isPrimary}`).join(",")}`}
+                incidentId={incident.id}
+                status={incident.status}
+                teamId={incident.team?.id ?? null}
+                teams={teams}
+                services={services}
+                selectedServiceIds={incident.affectedServices.map(
+                  (service) => service.id,
+                )}
+                primaryServiceId={
+                  incident.affectedServices.find((service) => service.isPrimary)
+                    ?.id ?? null
+                }
+              />
+            </div>
           </aside>
         ) : null}
       </div>

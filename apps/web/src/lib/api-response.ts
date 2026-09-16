@@ -24,7 +24,9 @@ export class ApiError extends Error {
   }
 }
 
-function validationIssues(error: { issues: readonly { path: PropertyKey[]; message: string; code: string }[] }) {
+function validationIssues(error: {
+  issues: readonly { path: PropertyKey[]; message: string; code: string }[];
+}) {
   return error.issues.map((issue) => ({
     path: issue.path.map(String).join("."),
     message: issue.message,

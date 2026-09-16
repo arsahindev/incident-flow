@@ -2,26 +2,26 @@
   "folders": [
     {
       "name": "API",
-      "path": "./apps/api"
-    }
+      "path": "./apps/api",
+    },
   ],
   "settings": {
     "git.openRepositoryInParentFolders": "always",
     "files.exclude": {
       "**/node_modules": true,
-      "**/dist": true
+      "**/dist": true,
     },
     "search.exclude": {
       "**/node_modules": true,
       "**/dist": true,
       "**/*.js.map": true,
-      "**/*.d.ts.map": true
+      "**/*.d.ts.map": true,
     },
     "files.watcherExclude": {
       "**/node_modules/**": true,
-      "**/dist/**": true
+      "**/dist/**": true,
     },
-    "search.useIgnoreFiles": true
+    "search.useIgnoreFiles": true,
   },
   "launch": {
     "version": "0.2.0",
@@ -40,7 +40,10 @@
         "outFiles": ["${workspaceFolder}/dist/**/*.js"],
         "resolveSourceMapLocations": ["${workspaceFolder}/dist/**/*.js"],
         "smartStep": true,
-        "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+        "skipFiles": [
+          "<node_internals>/**",
+          "${workspaceFolder}/node_modules/**",
+        ],
       },
       {
         "name": "API: debug current test file",
@@ -50,9 +53,12 @@
         "program": "${file}",
         "cwd": "${workspaceFolder}",
         "console": "integratedTerminal",
-        "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
-      }
-    ]
+        "skipFiles": [
+          "<node_internals>/**",
+          "${workspaceFolder}/node_modules/**",
+        ],
+      },
+    ],
   },
   "tasks": {
     "version": "2.0.0",
@@ -63,11 +69,11 @@
         "command": "pnpm",
         "args": ["build"],
         "options": {
-          "cwd": "${workspaceFolder}"
+          "cwd": "${workspaceFolder}",
         },
         "problemMatcher": ["$tsc"],
-        "group": "build"
-      }
-    ]
-  }
+        "group": "build",
+      },
+    ],
+  },
 }

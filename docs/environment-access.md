@@ -4,10 +4,10 @@ Read when using demo accounts, understanding seed behavior or locating private
 recovery material. This is the authoritative account/access reference; paths and
 hosted seed state are recorded information, not a new inspection of private files.
 
-| Environment | Login | Public responder email | Public password |
-| --- | --- | --- | --- |
-| Local | http://localhost:3000/login | `demo+local@incidentflow.demo` | `IncidentFlow-Demo-local-2026!` |
-| Production | https://incidentflow-prod.vercel.app/login | `demo+prod@incidentflow.demo` | `IncidentFlow-Demo-prod-2026!` |
+| Environment | Login                                      | Public responder email         | Public password                 |
+| ----------- | ------------------------------------------ | ------------------------------ | ------------------------------- |
+| Local       | http://localhost:3000/login                | `demo+local@incidentflow.demo` | `IncidentFlow-Demo-local-2026!` |
+| Production  | https://incidentflow-prod.vercel.app/login | `demo+prod@incidentflow.demo`  | `IncidentFlow-Demo-prod-2026!`  |
 
 The public account is a responder, never an owner or admin. It can work on
 incidents and read the service catalog, teams and members. It cannot invite

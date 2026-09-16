@@ -18,9 +18,19 @@ const requiredEnvironment = {
 
 test("Ably requires its server key and Vercel rejects the Socket.IO transport", () => {
   assert.equal(loadConfig(requiredEnvironment).REALTIME_TRANSPORT, "socketio");
-  assert.throws(() => loadConfig({ ...requiredEnvironment, REALTIME_TRANSPORT: "ably" }));
+  assert.throws(() =>
+    loadConfig({ ...requiredEnvironment, REALTIME_TRANSPORT: "ably" }),
+  );
   assert.throws(() => loadConfig({ ...requiredEnvironment, VERCEL: "1" }));
-  assert.equal(loadConfig({ ...requiredEnvironment, VERCEL: "1", REALTIME_TRANSPORT: "ably", ABLY_API_KEY: "test.key:test-only" }).REALTIME_TRANSPORT, "ably");
+  assert.equal(
+    loadConfig({
+      ...requiredEnvironment,
+      VERCEL: "1",
+      REALTIME_TRANSPORT: "ably",
+      ABLY_API_KEY: "test.key:test-only",
+    }).REALTIME_TRANSPORT,
+    "ably",
+  );
 });
 
 test("API configuration requires database URL and web origin", () => {
@@ -29,14 +39,17 @@ test("API configuration requires database URL and web origin", () => {
     (error: unknown) =>
       error instanceof ConfigurationError &&
       error.issues.some(
-        (issue) => issue.variable === "DATABASE_URL" && issue.reason === "is required",
-      ) &&
-      error.issues.some(
-        (issue) => issue.variable === "WEB_ORIGIN" && issue.reason === "is required",
+        (issue) =>
+          issue.variable === "DATABASE_URL" && issue.reason === "is required",
       ) &&
       error.issues.some(
         (issue) =>
-          issue.variable === "PASSWORD_PEPPER" && issue.reason === "is required",
+          issue.variable === "WEB_ORIGIN" && issue.reason === "is required",
+      ) &&
+      error.issues.some(
+        (issue) =>
+          issue.variable === "PASSWORD_PEPPER" &&
+          issue.reason === "is required",
       ),
   );
 });

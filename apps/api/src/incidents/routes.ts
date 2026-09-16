@@ -25,7 +25,8 @@ export async function registerIncidentRoutes(
   const incidentService = new IncidentApplicationService(
     repository,
     options.realtimePublisher,
-    (error) => app.log.error({ err: error }, "Realtime incident publication failed"),
+    (error) =>
+      app.log.error({ err: error }, "Realtime incident publication failed"),
   );
 
   app.get("/v1/teams", async (request) => {
@@ -45,7 +46,10 @@ export async function registerIncidentRoutes(
     const parsed = createIncidentSchema.safeParse(request.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);
 
-    const incident = await incidentService.createIncident(request.auth, parsed.data);
+    const incident = await incidentService.createIncident(
+      request.auth,
+      parsed.data,
+    );
     return reply.code(201).send({ incident });
   });
 

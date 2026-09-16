@@ -9,9 +9,17 @@ import {
 } from "./env/schema.js";
 
 test("web client accepts managed Ably without a public server key", () => {
-  assert.deepEqual(parseConfiguration("incidentflow-web", webClientEnvironmentSchema("production"), {
-    NEXT_PUBLIC_REALTIME_URL: "ably", ABLY_API_KEY: "must-not-be-exported",
-  }), { NEXT_PUBLIC_REALTIME_URL: "ably" });
+  assert.deepEqual(
+    parseConfiguration(
+      "incidentflow-web",
+      webClientEnvironmentSchema("production"),
+      {
+        NEXT_PUBLIC_REALTIME_URL: "ably",
+        ABLY_API_KEY: "must-not-be-exported",
+      },
+    ),
+    { NEXT_PUBLIC_REALTIME_URL: "ably" },
+  );
 });
 
 test("web server environment requires an API URL", () => {
@@ -25,7 +33,8 @@ test("web server environment requires an API URL", () => {
     (error: unknown) =>
       error instanceof ConfigurationError &&
       error.issues.some(
-        (issue) => issue.variable === "API_URL" && issue.reason === "is required",
+        (issue) =>
+          issue.variable === "API_URL" && issue.reason === "is required",
       ),
   );
 });

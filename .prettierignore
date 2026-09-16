@@ -1,0 +1,17 @@
+# Dependencies and generated/build output
+**/node_modules/
+.pnpm-store/
+**/.next/
+**/dist/
+**/out/
+**/build/
+**/coverage/
+**/next-env.d.ts
+apps/api/src/generated/
+pnpm-lock.yaml
+
+# Installed agent skills, private local configuration and deployment artifacts
+.agents/
+.deployment/
+**/.vercel/
+**/.env*

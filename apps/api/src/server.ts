@@ -1,4 +1,8 @@
-import { ConfigurationError, configurationFailureLog, loadConfig } from "./config.js";
+import {
+  ConfigurationError,
+  configurationFailureLog,
+  loadConfig,
+} from "./config.js";
 import { createRuntime } from "./runtime.js";
 
 try {

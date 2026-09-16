@@ -12,7 +12,10 @@ const slugSchema = z
   .trim()
   .min(2)
   .max(80)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens");
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Use lowercase letters, numbers, and hyphens",
+  );
 
 const nullableUuid = z.uuid().nullable().optional();
 
@@ -55,9 +58,12 @@ export const updateServiceSchema = z
     ownerTeamId: nullableUuid,
     archived: z.boolean().optional(),
   })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), {
-    message: "At least one field must be provided",
-  });
+  .refine(
+    (input) => Object.values(input).some((value) => value !== undefined),
+    {
+      message: "At least one field must be provided",
+    },
+  );
 
 export const updateServiceEnvironmentSchema = z
   .object({
@@ -68,9 +74,12 @@ export const updateServiceEnvironmentSchema = z
     expiresAt: z.iso.datetime().nullable().optional(),
     status: z.enum(["active", "archived"]).optional(),
   })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), {
-    message: "At least one field must be provided",
-  })
+  .refine(
+    (input) => Object.values(input).some((value) => value !== undefined),
+    {
+      message: "At least one field must be provided",
+    },
+  )
   .refine((input) => input.isEphemeral !== false || !input.expiresAt, {
     path: ["expiresAt"],
     message: "Only ephemeral environments may have an expiry time",

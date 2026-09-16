@@ -11,12 +11,12 @@ budget. Do not re-enable the retired AWS deployment scripts.
 
 ## Current topology
 
-| Component | Project | Public origin |
-| --- | --- | --- |
-| Next.js on Vercel Hobby | incidentflow-prod | https://incidentflow-prod.vercel.app |
+| Component               | Project               | Public origin                            |
+| ----------------------- | --------------------- | ---------------------------------------- |
+| Next.js on Vercel Hobby | incidentflow-prod     | https://incidentflow-prod.vercel.app     |
 | Fastify on Vercel Hobby | incidentflow-api-prod | https://incidentflow-api-prod.vercel.app |
-| PostgreSQL on Neon Free | incidentflow-prod | Server-only pooled connection |
-| Realtime on Ably Free | IncidentFlow | Scoped token-authenticated channels |
+| PostgreSQL on Neon Free | incidentflow-prod     | Server-only pooled connection            |
+| Realtime on Ably Free   | IncidentFlow          | Scoped token-authenticated channels      |
 
 Both app projects target Node 24 and Frankfurt functions. They form one prod
 environment, not separate dev/prod deployments. Preview deployments were recorded
@@ -38,16 +38,16 @@ migrations, seed/deployment evidence and known limits at the time of verificatio
 
 ## Production configuration
 
-| Project | Variable | Setting |
-| --- | --- | --- |
-| API | DATABASE_URL | Private pooled Neon URI |
-| API | PASSWORD_PEPPER | Existing private seed pepper |
-| API | ABLY_API_KEY | Restricted Publish/Subscribe key on incidentflow:*; revocable tokens enabled |
-| API | REALTIME_TRANSPORT | ably |
-| API | WEB_ORIGIN | https://incidentflow-prod.vercel.app |
-| Web | API_URL | https://incidentflow-api-prod.vercel.app |
-| Web | NEXT_PUBLIC_REALTIME_URL | ably, provided at build time |
-| Web | PUBLIC_DEMO_ENVIRONMENT | prod |
+| Project | Variable                 | Setting                                                                      |
+| ------- | ------------------------ | ---------------------------------------------------------------------------- |
+| API     | DATABASE_URL             | Private pooled Neon URI                                                      |
+| API     | PASSWORD_PEPPER          | Existing private seed pepper                                                 |
+| API     | ABLY_API_KEY             | Restricted Publish/Subscribe key on incidentflow:*; revocable tokens enabled |
+| API     | REALTIME_TRANSPORT       | ably                                                                         |
+| API     | WEB_ORIGIN               | https://incidentflow-prod.vercel.app                                         |
+| Web     | API_URL                  | https://incidentflow-api-prod.vercel.app                                     |
+| Web     | NEXT_PUBLIC_REALTIME_URL | ably, provided at build time                                                 |
+| Web     | PUBLIC_DEMO_ENVIRONMENT  | prod                                                                         |
 
 Private runtime values are Vercel production-sensitive variables. Local recovery
 material is in ignored .deployment/neon-production.env; it must never enter Git

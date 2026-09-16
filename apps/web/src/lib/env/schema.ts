@@ -26,7 +26,9 @@ const requiredString = z
   .min(1, "is required");
 
 function isLoopbackHostname(hostname: string) {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
+  );
 }
 
 export function httpOriginSchema(nodeEnvironment: string | undefined) {
@@ -67,17 +69,25 @@ export function httpOriginSchema(nodeEnvironment: string | undefined) {
     .transform((value) => new URL(value).origin);
 }
 
-export function webServerEnvironmentSchema(nodeEnvironment: string | undefined) {
+export function webServerEnvironmentSchema(
+  nodeEnvironment: string | undefined,
+) {
   return z.object({
     API_URL: httpOriginSchema(nodeEnvironment),
     PUBLIC_DEMO_ENVIRONMENT: publicDemoEnvironmentSchema.optional(),
   });
 }
 
-export function webClientEnvironmentSchema(nodeEnvironment: string | undefined) {
+export function webClientEnvironmentSchema(
+  nodeEnvironment: string | undefined,
+) {
   return z.object({
     NEXT_PUBLIC_REALTIME_URL: requiredString.pipe(
-      z.union([z.literal("same-origin"), z.literal("ably"), httpOriginSchema(nodeEnvironment)]),
+      z.union([
+        z.literal("same-origin"),
+        z.literal("ably"),
+        httpOriginSchema(nodeEnvironment),
+      ]),
     ),
   });
 }

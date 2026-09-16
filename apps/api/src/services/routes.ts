@@ -24,7 +24,9 @@ export async function registerServiceRoutes(
 
   app.get("/v1/services", async (request) => {
     requirePermission(request.auth, "services.read");
-    return { services: await repository.listServices(request.auth.organizationSlug) };
+    return {
+      services: await repository.listServices(request.auth.organizationSlug),
+    };
   });
 
   app.post("/v1/services", async (request, reply) => {

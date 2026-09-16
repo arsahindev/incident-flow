@@ -10,7 +10,10 @@ import type {
 
 export interface ServiceRepository {
   listServices(organizationSlug: string): Promise<ServiceRecord[]>;
-  getService(organizationSlug: string, serviceId: string): Promise<ServiceDetailRecord>;
+  getService(
+    organizationSlug: string,
+    serviceId: string,
+  ): Promise<ServiceDetailRecord>;
   createService(
     organizationSlug: string,
     input: CreateServiceInput,

@@ -2,9 +2,15 @@ import z from "zod";
 
 import type { RealtimeIncidentSignal } from "@incidentflow/contracts";
 
-export const socketConnectionStatuses = ["connecting", "connected", "disconnected"] as const;
+export const socketConnectionStatuses = [
+  "connecting",
+  "connected",
+  "disconnected",
+] as const;
 export const socketConnectionStatusSchema = z.enum(socketConnectionStatuses);
-export type SocketConnectionStatus = z.infer<typeof socketConnectionStatusSchema>;
+export type SocketConnectionStatus = z.infer<
+  typeof socketConnectionStatusSchema
+>;
 
 export function synchronizeIncidentVersions(
   latestVersions: Map<string, number>,
@@ -12,7 +18,8 @@ export function synchronizeIncidentVersions(
 ) {
   for (const incident of canonicalVersions) {
     const current = latestVersions.get(incident.id) ?? 0;
-    if (incident.version > current) latestVersions.set(incident.id, incident.version);
+    if (incident.version > current)
+      latestVersions.set(incident.id, incident.version);
   }
 }
 

@@ -41,7 +41,10 @@ export function CreateIncidentForm({
       </div>
 
       <div>
-        <label htmlFor="description" className="text-sm font-medium text-slate-200">
+        <label
+          htmlFor="description"
+          className="text-sm font-medium text-slate-200"
+        >
           Description
         </label>
         <textarea
@@ -56,7 +59,10 @@ export function CreateIncidentForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="priority" className="text-sm font-medium text-slate-200">
+          <label
+            htmlFor="priority"
+            className="text-sm font-medium text-slate-200"
+          >
             Priority
           </label>
           <select
@@ -72,7 +78,10 @@ export function CreateIncidentForm({
           </select>
         </div>
         <div>
-          <label htmlFor="teamId" className="text-sm font-medium text-slate-200">
+          <label
+            htmlFor="teamId"
+            className="text-sm font-medium text-slate-200"
+          >
             Assigned team
           </label>
           <select
@@ -92,7 +101,10 @@ export function CreateIncidentForm({
       </div>
 
       <div>
-        <label htmlFor="serviceIds" className="text-sm font-medium text-slate-200">
+        <label
+          htmlFor="serviceIds"
+          className="text-sm font-medium text-slate-200"
+        >
           Affected services
         </label>
         <select
@@ -126,7 +138,10 @@ export function CreateIncidentForm({
       </div>
 
       <div>
-        <label htmlFor="primaryServiceId" className="text-sm font-medium text-slate-200">
+        <label
+          htmlFor="primaryServiceId"
+          className="text-sm font-medium text-slate-200"
+        >
           Primary service
         </label>
         <select
@@ -138,7 +153,9 @@ export function CreateIncidentForm({
         >
           <option value="">Use the first affected service</option>
           {selectedServices.map((service) => (
-            <option key={service.id} value={service.id}>{service.name}</option>
+            <option key={service.id} value={service.id}>
+              {service.name}
+            </option>
           ))}
         </select>
         <p className="mt-1 text-xs text-slate-500">

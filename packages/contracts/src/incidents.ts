@@ -7,7 +7,12 @@ export const incidentStatuses = ["open", "acknowledged", "resolved"] as const;
 export const incidentStatusSchema = z.enum(incidentStatuses);
 export type IncidentStatus = z.infer<typeof incidentStatusSchema>;
 
-export const incidentPriorities = ["low", "medium", "high", "critical"] as const;
+export const incidentPriorities = [
+  "low",
+  "medium",
+  "high",
+  "critical",
+] as const;
 export const incidentPrioritySchema = z.enum(incidentPriorities);
 export type IncidentPriority = z.infer<typeof incidentPrioritySchema>;
 
@@ -30,7 +35,7 @@ export const indidentActivityTypes = [
   "created",
   "status_changed",
   "team_assigned",
-  "affected_services_changed"
+  "affected_services_changed",
 ] as const;
 export const incidentActivityTypeSchema = z.enum(indidentActivityTypes);
 export type IncidentActivityType = z.infer<typeof incidentActivityTypeSchema>;
@@ -84,4 +89,6 @@ export const incidentsResponseSchema = z.object({
   pagination: incidentPaginationSchema,
 });
 
-export const incidentResponseSchema = z.object({ incident: incidentDetailSchema });
+export const incidentResponseSchema = z.object({
+  incident: incidentDetailSchema,
+});

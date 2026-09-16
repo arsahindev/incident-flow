@@ -15,7 +15,10 @@ test("peppered password hashes use unique automatic salts", async () => {
 
   assert.match(firstHash, /^argon2id-pepper-v1:\$argon2id\$/);
   assert.notEqual(firstHash, secondHash);
-  assert.equal((await verifyPasswordHash(firstHash, password, pepper)).matches, true);
+  assert.equal(
+    (await verifyPasswordHash(firstHash, password, pepper)).matches,
+    true,
+  );
 });
 
 test("password verification requires the configured pepper", async () => {

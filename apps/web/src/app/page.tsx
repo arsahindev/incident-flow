@@ -41,13 +41,17 @@ export default async function Home({
     ? (requestedPriority as IncidentPriority)
     : undefined;
   const requestedPage = Number(one(search.page) ?? "1");
-  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const [{ incidents, pagination }, { teams }, { services }] = await Promise.all([
-    getIncidents({ serviceId, teamId, status, priority, page }),
-    getTeams(),
-    getServices(),
-  ]);
-  const openCount = incidents.filter((incident) => incident.status === "open").length;
+  const page =
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const [{ incidents, pagination }, { teams }, { services }] =
+    await Promise.all([
+      getIncidents({ serviceId, teamId, status, priority, page }),
+      getTeams(),
+      getServices(),
+    ]);
+  const openCount = incidents.filter(
+    (incident) => incident.status === "open",
+  ).length;
   const acknowledgedCount = incidents.filter(
     (incident) => incident.status === "acknowledged",
   ).length;
@@ -61,9 +65,12 @@ export default async function Home({
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-400">
           Operations
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Incident dashboard</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          Incident dashboard
+        </h1>
         <p className="mt-2 max-w-2xl text-slate-400">
-          Create incidents, coordinate ownership, and follow every lifecycle change.
+          Create incidents, coordinate ownership, and follow every lifecycle
+          change.
         </p>
         <div className="mt-3">
           <RealtimeIncidentRefresh
@@ -75,13 +82,27 @@ export default async function Home({
         </div>
       </div>
 
-      <section className="mt-10 grid gap-4 md:grid-cols-3" aria-label="Incident summary">
+      <section
+        className="mt-10 grid gap-4 md:grid-cols-3"
+        aria-label="Incident summary"
+      >
         {[
-          ["Matching incidents", pagination.total, "Across the selected filters"],
+          [
+            "Matching incidents",
+            pagination.total,
+            "Across the selected filters",
+          ],
           ["Open on this page", openCount, "Awaiting acknowledgement"],
-          ["Acknowledged on this page", acknowledgedCount, `${resolvedCount} resolved`],
+          [
+            "Acknowledged on this page",
+            acknowledgedCount,
+            `${resolvedCount} resolved`,
+          ],
         ].map(([label, value, detail]) => (
-          <article key={label} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <article
+            key={label}
+            className="rounded-xl border border-slate-800 bg-slate-900 p-5"
+          >
             <p className="text-sm text-slate-400">{label}</p>
             <p className="mt-3 text-3xl font-semibold">{value}</p>
             <p className="mt-2 text-sm text-slate-500">{detail}</p>
@@ -95,35 +116,74 @@ export default async function Home({
       >
         <label className="text-sm text-slate-300">
           Service
-          <select name="serviceId" defaultValue={serviceId ?? ""} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+          <select
+            name="serviceId"
+            defaultValue={serviceId ?? ""}
+            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+          >
             <option value="">All services</option>
-            {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+            {services.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name}
+              </option>
+            ))}
           </select>
         </label>
         <label className="text-sm text-slate-300">
           Team
-          <select name="teamId" defaultValue={teamId ?? ""} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+          <select
+            name="teamId"
+            defaultValue={teamId ?? ""}
+            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+          >
             <option value="">All teams</option>
-            {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
           </select>
         </label>
         <label className="text-sm text-slate-300">
           Status
-          <select name="status" defaultValue={status ?? ""} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+          <select
+            name="status"
+            defaultValue={status ?? ""}
+            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+          >
             <option value="">All statuses</option>
-            {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
+            {statuses.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
           </select>
         </label>
         <label className="text-sm text-slate-300">
           Priority
-          <select name="priority" defaultValue={priority ?? ""} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+          <select
+            name="priority"
+            defaultValue={priority ?? ""}
+            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+          >
             <option value="">All priorities</option>
-            {priorities.map((value) => <option key={value} value={value}>{value}</option>)}
+            {priorities.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
           </select>
         </label>
         <div className="flex gap-3 md:col-span-4">
-          <button className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950">Apply filters</button>
-          <Link href="/" className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300">Reset</Link>
+          <button className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950">
+            Apply filters
+          </button>
+          <Link
+            href="/"
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300"
+          >
+            Reset
+          </Link>
         </div>
       </form>
 
@@ -134,12 +194,16 @@ export default async function Home({
           </div>
           {incidents.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-              <div className="rounded-full border border-slate-700 bg-slate-800 p-3 text-xl" aria-hidden="true">
+              <div
+                className="rounded-full border border-slate-700 bg-slate-800 p-3 text-xl"
+                aria-hidden="true"
+              >
                 ✓
               </div>
               <p className="mt-4 font-medium">No incidents yet</p>
               <p className="mt-1 max-w-md text-sm text-slate-400">
-                Create the first incident to exercise the persisted lifecycle and activity timeline.
+                Create the first incident to exercise the persisted lifecycle
+                and activity timeline.
               </p>
             </div>
           ) : (
@@ -152,9 +216,12 @@ export default async function Home({
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-medium text-slate-100">{incident.title}</h3>
+                        <h3 className="font-medium text-slate-100">
+                          {incident.title}
+                        </h3>
                         <p className="mt-1 text-sm text-slate-400">
-                          {incident.team?.name ?? "Unassigned"} · {formatDate(incident.createdAt)}
+                          {incident.team?.name ?? "Unassigned"} ·{" "}
+                          {formatDate(incident.createdAt)}
                         </p>
                         <p className="mt-2 text-xs text-slate-500">
                           {incident.affectedServices.length > 0
@@ -176,10 +243,44 @@ export default async function Home({
           )}
           {pagination.totalPages > 1 ? (
             <div className="flex items-center justify-between border-t border-slate-800 px-5 py-4 text-sm">
-              <span className="text-slate-500">Page {pagination.page} of {pagination.totalPages}</span>
+              <span className="text-slate-500">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
               <div className="flex gap-2">
-                {pagination.page > 1 ? <Link href={{ query: { ...Object.fromEntries(Object.entries(search).filter(([, value]) => typeof value === "string")), page: pagination.page - 1 } }} className="rounded border border-slate-700 px-3 py-1.5">Previous</Link> : null}
-                {pagination.page < pagination.totalPages ? <Link href={{ query: { ...Object.fromEntries(Object.entries(search).filter(([, value]) => typeof value === "string")), page: pagination.page + 1 } }} className="rounded border border-slate-700 px-3 py-1.5">Next</Link> : null}
+                {pagination.page > 1 ? (
+                  <Link
+                    href={{
+                      query: {
+                        ...Object.fromEntries(
+                          Object.entries(search).filter(
+                            ([, value]) => typeof value === "string",
+                          ),
+                        ),
+                        page: pagination.page - 1,
+                      },
+                    }}
+                    className="rounded border border-slate-700 px-3 py-1.5"
+                  >
+                    Previous
+                  </Link>
+                ) : null}
+                {pagination.page < pagination.totalPages ? (
+                  <Link
+                    href={{
+                      query: {
+                        ...Object.fromEntries(
+                          Object.entries(search).filter(
+                            ([, value]) => typeof value === "string",
+                          ),
+                        ),
+                        page: pagination.page + 1,
+                      },
+                    }}
+                    className="rounded border border-slate-700 px-3 py-1.5"
+                  >
+                    Next
+                  </Link>
+                ) : null}
               </div>
             </div>
           ) : null}

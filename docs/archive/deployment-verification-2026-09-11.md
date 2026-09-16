@@ -35,21 +35,21 @@ was removed before recreation. Snapshot
 
 ## Quality results
 
-| Check | Result |
-| --- | --- |
-| `pnpm lint` | PASS, all 3 packages |
-| `pnpm typecheck` | PASS, all 3 packages |
-| `pnpm test` | PASS: contracts 4, API 34, web 12; 6 DB cases intentionally skipped |
-| `pnpm test:integration` | PASS: 6/6 real PostgreSQL tests, none skipped |
-| `prisma migrate status` | PASS: schema current, 5 migrations |
-| `pnpm build` | PASS: contracts, API, Next.js production build |
-| `pnpm audit --prod --audit-level high` | PASS: no known vulnerabilities |
-| Published-image container regression | PASS: untrusted CA rejected, wrong host rejected, 5 migrations from empty DB, seed, `/health`, `/ready`, `/login` all HTTP 200 |
-| Shell and smoke-script syntax | PASS |
-| `git diff --check` | PASS |
-| CloudFormation `validate-template` | PASS: both templates |
-| Dev creation change set | 11 additions; zero reported failed validation events |
-| cfn-lint / cfn-guard | Not installed; not run. AWS validation and reviewed change sets used. |
+| Check                                  | Result                                                                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm lint`                            | PASS, all 3 packages                                                                                                           |
+| `pnpm typecheck`                       | PASS, all 3 packages                                                                                                           |
+| `pnpm test`                            | PASS: contracts 4, API 34, web 12; 6 DB cases intentionally skipped                                                            |
+| `pnpm test:integration`                | PASS: 6/6 real PostgreSQL tests, none skipped                                                                                  |
+| `prisma migrate status`                | PASS: schema current, 5 migrations                                                                                             |
+| `pnpm build`                           | PASS: contracts, API, Next.js production build                                                                                 |
+| `pnpm audit --prod --audit-level high` | PASS: no known vulnerabilities                                                                                                 |
+| Published-image container regression   | PASS: untrusted CA rejected, wrong host rejected, 5 migrations from empty DB, seed, `/health`, `/ready`, `/login` all HTTP 200 |
+| Shell and smoke-script syntax          | PASS                                                                                                                           |
+| `git diff --check`                     | PASS                                                                                                                           |
+| CloudFormation `validate-template`     | PASS: both templates                                                                                                           |
+| Dev creation change set                | 11 additions; zero reported failed validation events                                                                           |
+| cfn-lint / cfn-guard                   | Not installed; not run. AWS validation and reviewed change sets used.                                                          |
 
 The first sandboxed unit run failed only for five loopback Socket.IO tests
 (`listen EPERM`). The rerun with loopback permissions passed all 50 non-DB tests.

@@ -255,10 +255,10 @@ This journey is intentionally later than reliable intake, persistence, event pro
 
 A webhook is an event-driven HTTP callback integration pattern. It uses ordinary HTTP endpoints; the distinction is the direction and event-driven contract, not a different protocol.
 
-| Direction, relative to IncidentFlow | Meaning |
-|---|---|
-| Inbound webhook | A customer service calls IncidentFlow because an event happened. |
-| Outbound webhook | IncidentFlow calls a customer-controlled endpoint because an IncidentFlow event happened. |
+| Direction, relative to IncidentFlow | Meaning                                                                                   |
+| ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| Inbound webhook                     | A customer service calls IncidentFlow because an event happened.                          |
+| Outbound webhook                    | IncidentFlow calls a customer-controlled endpoint because an IncidentFlow event happened. |
 
 The known pattern where a client starts an asynchronous operation and gives the server a callback URL is a valid outbound webhook/callback pattern:
 
@@ -380,14 +380,14 @@ The purpose of ITIL Incident Management is to minimize the negative impact of in
 
 Use these distinctions consistently:
 
-| Record/practice | Purpose |
-|---|---|
-| Event/alert | A detected change or signal that may require attention; not every alert becomes an incident. |
-| Incident | An unplanned interruption to a service or reduction in service quality; focus on restoring service. |
-| Major incident | A high-impact incident requiring exceptional urgency, coordination, and communication. |
-| Problem | The actual or potential cause of one or more incidents; focus on root cause, workarounds, and known errors. |
-| Change | A controlled modification that may remediate a problem or alter a service; focus on risk and safe implementation. |
-| Service request | A normal, predefined user request; it is not an incident and is outside the initial product scope. |
+| Record/practice | Purpose                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Event/alert     | A detected change or signal that may require attention; not every alert becomes an incident.                      |
+| Incident        | An unplanned interruption to a service or reduction in service quality; focus on restoring service.               |
+| Major incident  | A high-impact incident requiring exceptional urgency, coordination, and communication.                            |
+| Problem         | The actual or potential cause of one or more incidents; focus on root cause, workarounds, and known errors.       |
+| Change          | A controlled modification that may remediate a problem or alter a service; focus on risk and safe implementation. |
+| Service request | A normal, predefined user request; it is not an incident and is outside the initial product scope.                |
 
 ### Product capabilities that support ITIL-aligned incident management
 

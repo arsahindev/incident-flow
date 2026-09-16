@@ -29,7 +29,9 @@ import type {
 
 const serviceInclude = {
   ownerTeam: { select: { id: true, name: true, slug: true } },
-  environments: { orderBy: [{ status: "asc" as const }, { name: "asc" as const }] },
+  environments: {
+    orderBy: [{ status: "asc" as const }, { name: "asc" as const }],
+  },
   _count: { select: { affectedIncidents: true } },
 } satisfies Prisma.ServiceInclude;
 
@@ -52,7 +54,9 @@ const serviceDetailInclude = {
   },
 } satisfies Prisma.ServiceInclude;
 
-type PrismaServiceRecord = Prisma.ServiceGetPayload<{ include: typeof serviceInclude }>;
+type PrismaServiceRecord = Prisma.ServiceGetPayload<{
+  include: typeof serviceInclude;
+}>;
 type PrismaServiceDetail = Prisma.ServiceGetPayload<{
   include: typeof serviceDetailInclude;
 }>;
@@ -220,7 +224,9 @@ export class PrismaServiceRepository implements ServiceRepository {
             slug: environment.slug,
             kind: environmentKindToPrisma[environment.kind],
             isEphemeral: environment.isEphemeral,
-            expiresAt: environment.expiresAt ? new Date(environment.expiresAt) : null,
+            expiresAt: environment.expiresAt
+              ? new Date(environment.expiresAt)
+              : null,
           })),
         });
 
@@ -235,7 +241,11 @@ export class PrismaServiceRepository implements ServiceRepository {
           },
         });
 
-        return this.getServiceInTransaction(transaction, organization.id, service.id);
+        return this.getServiceInTransaction(
+          transaction,
+          organization.id,
+          service.id,
+        );
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -260,7 +270,11 @@ export class PrismaServiceRepository implements ServiceRepository {
           select: { id: true, organizationId: true },
         });
         if (!existing) throw new ResourceNotFoundError("Service");
-        await this.assertTeam(transaction, existing.organizationId, input.ownerTeamId);
+        await this.assertTeam(
+          transaction,
+          existing.organizationId,
+          input.ownerTeamId,
+        );
 
         await transaction.service.update({
           where: {
@@ -275,7 +289,9 @@ export class PrismaServiceRepository implements ServiceRepository {
             description: input.description,
             type: input.type ? serviceTypeToPrisma[input.type] : undefined,
             tier: input.tier ? serviceTierToPrisma[input.tier] : undefined,
-            status: input.status ? serviceStatusToPrisma[input.status] : undefined,
+            status: input.status
+              ? serviceStatusToPrisma[input.status]
+              : undefined,
             ownerTeamId: input.ownerTeamId,
             archivedAt:
               input.archived === undefined
@@ -300,7 +316,9 @@ export class PrismaServiceRepository implements ServiceRepository {
             action: input.archived ? "service.archived" : "service.updated",
             entityType: "service",
             entityId: serviceId,
-            metadata: JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue,
+            metadata: JSON.parse(
+              JSON.stringify(input),
+            ) as Prisma.InputJsonValue,
           },
         });
 
@@ -312,7 +330,9 @@ export class PrismaServiceRepository implements ServiceRepository {
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ResourceConflictError("A service with that slug already exists");
+        throw new ResourceConflictError(
+          "A service with that slug already exists",
+        );
       }
       throw error;
     }
@@ -332,7 +352,9 @@ export class PrismaServiceRepository implements ServiceRepository {
         });
         if (!service) throw new ResourceNotFoundError("Service");
         if (service.archivedAt) {
-          throw new ResourceConflictError("Archived services cannot add environments");
+          throw new ResourceConflictError(
+            "Archived services cannot add environments",
+          );
         }
 
         const environment = await transaction.serviceEnvironment.create({
@@ -419,7 +441,9 @@ export class PrismaServiceRepository implements ServiceRepository {
             action: "service_environment.updated",
             entityType: "service_environment",
             entityId: environmentId,
-            metadata: JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue,
+            metadata: JSON.parse(
+              JSON.stringify(input),
+            ) as Prisma.InputJsonValue,
           },
         });
         return toEnvironment(environment);

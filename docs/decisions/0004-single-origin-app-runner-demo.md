@@ -92,6 +92,7 @@ the same host-only cookie and exact-origin validation. This deployment provides
 realtime over HTTP polling; it does not claim App Runner WebSocket support.
 
 See https://github.com/aws/apprunner-roadmap/issues/13 and the live smoke results.
+
 # Public portfolio access amendment (2026-09-14)
 
 The user authorized public demo access while registration is unavailable. Each

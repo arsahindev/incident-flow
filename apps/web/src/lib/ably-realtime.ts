@@ -2,15 +2,18 @@ import { Realtime, type ClientOptions } from "ably";
 import { realtimeTokenSchema } from "./realtime-token";
 import type { SocketConnectionStatus } from "./realtime";
 
-export function connectAblyRealtime(handlers: {
-  status: (status: SocketConnectionStatus) => void;
-  signal: (payload: unknown) => void;
-  refetch: () => void;
-  authenticationRequired: () => void;
-}, dependencies: {
-  fetch?: typeof fetch;
-  createClient?: (options: ClientOptions) => Realtime;
-} = {}) {
+export function connectAblyRealtime(
+  handlers: {
+    status: (status: SocketConnectionStatus) => void;
+    signal: (payload: unknown) => void;
+    refetch: () => void;
+    authenticationRequired: () => void;
+  },
+  dependencies: {
+    fetch?: typeof fetch;
+    createClient?: (options: ClientOptions) => Realtime;
+  } = {},
+) {
   let closed = false;
   let channelName: string | undefined;
   const pending = new AbortController();
@@ -21,15 +24,25 @@ export function connectAblyRealtime(handlers: {
     client.close();
     handlers.authenticationRequired();
   };
-  const client = (dependencies.createClient ?? ((options) => new Realtime(options)))({
+  const client = (
+    dependencies.createClient ?? ((options) => new Realtime(options))
+  )({
     autoConnect: false,
     logLevel: 0,
     authCallback: async (_params, callback) => {
       try {
-        const response = await (dependencies.fetch ?? fetch)("/api/realtime/token", {
-          method: "POST", credentials: "same-origin", cache: "no-store",
-          signal: AbortSignal.any([pending.signal, AbortSignal.timeout(10_000)]),
-        });
+        const response = await (dependencies.fetch ?? fetch)(
+          "/api/realtime/token",
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            signal: AbortSignal.any([
+              pending.signal,
+              AbortSignal.timeout(10_000),
+            ]),
+          },
+        );
         if (closed) return;
         if (response.status === 401 || response.status === 403) {
           callback("Authentication required", null);
@@ -57,11 +70,17 @@ export function connectAblyRealtime(handlers: {
             if (!closed && !change.resumed) handlers.refetch();
           });
           for (const event of ["detached", "suspended", "failed"] as const) {
-            channel.on(event, () => { if (!closed) handlers.status("disconnected"); });
+            channel.on(event, () => {
+              if (!closed) handlers.status("disconnected");
+            });
           }
-          void channel.subscribe("realtime:incident", (message) => {
-            if (!closed) handlers.signal(message.data);
-          }).catch(() => { if (!closed) handlers.status("disconnected"); });
+          void channel
+            .subscribe("realtime:incident", (message) => {
+              if (!closed) handlers.signal(message.data);
+            })
+            .catch(() => {
+              if (!closed) handlers.status("disconnected");
+            });
         }
         callback(null, issued.token);
       } catch {
@@ -75,12 +94,17 @@ export function connectAblyRealtime(handlers: {
   client.connection.on((change) => {
     if (closed) return;
     if (change.current === "connected") {
-      if (channelName && client.channels.get(channelName).state === "attached") {
+      if (
+        channelName &&
+        client.channels.get(channelName).state === "attached"
+      ) {
         handlers.status("connected");
         handlers.refetch();
       }
     } else {
-      handlers.status(change.current === "connecting" ? "connecting" : "disconnected");
+      handlers.status(
+        change.current === "connecting" ? "connecting" : "disconnected",
+      );
     }
   });
   client.connect();

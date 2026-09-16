@@ -45,7 +45,13 @@ export type Service = {
   name: string;
   slug: string;
   description: string | null;
-  type: "application" | "api" | "platform" | "infrastructure" | "business" | "external";
+  type:
+    | "application"
+    | "api"
+    | "platform"
+    | "infrastructure"
+    | "business"
+    | "external";
   tier: "critical" | "high" | "medium" | "low";
   status: "operational" | "degraded" | "disrupted" | "maintenance";
   ownerTeam: Team | null;

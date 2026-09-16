@@ -35,7 +35,11 @@ export class IncidentApplicationService {
       input,
       context.userId,
     );
-    await this.publishChanges(context.organizationId, result.incident, result.changes);
+    await this.publishChanges(
+      context.organizationId,
+      result.incident,
+      result.changes,
+    );
     return result.incident;
   }
 
@@ -50,7 +54,11 @@ export class IncidentApplicationService {
       input,
       context.userId,
     );
-    await this.publishChanges(context.organizationId, result.incident, result.changes);
+    await this.publishChanges(
+      context.organizationId,
+      result.incident,
+      result.changes,
+    );
     return result.incident;
   }
 
@@ -60,13 +68,17 @@ export class IncidentApplicationService {
     changes: IncidentMutationChange[],
   ) {
     const publications = changes.map((change) =>
-      this.realtimePublisher.publishIncidentSignal(organizationId, incident.id, {
-        schemaVersion: 1,
-        type: signalTypeByChange[change],
-        incidentId: incident.id,
-        incidentVersion: incident.version,
-        occurredAt: incident.updatedAt,
-      }),
+      this.realtimePublisher.publishIncidentSignal(
+        organizationId,
+        incident.id,
+        {
+          schemaVersion: 1,
+          type: signalTypeByChange[change],
+          incidentId: incident.id,
+          incidentVersion: incident.version,
+          occurredAt: incident.updatedAt,
+        },
+      ),
     );
     const results = await Promise.allSettled(publications);
     for (const result of results) {

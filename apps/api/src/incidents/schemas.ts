@@ -6,24 +6,31 @@ export const incidentIdParamsSchema = z.object({
   incidentId: z.string().uuid(),
 });
 
-export const createIncidentSchema = z.object({
-  title: z.string().trim().min(3).max(160),
-  description: z.string().trim().max(5_000).nullable().optional(),
-  priority: z.enum(incidentPriorities).default("medium"),
-  teamId: z.string().uuid().nullable().optional(),
-  serviceIds: z.array(z.uuid()).min(1).max(20),
-  primaryServiceId: z.uuid().nullable().optional(),
-}).refine(
-  (input) =>
-    !input.primaryServiceId || input.serviceIds.includes(input.primaryServiceId),
-  {
-    path: ["primaryServiceId"],
-    message: "Primary service must be included in affected services",
-  },
-).refine((input) => new Set(input.serviceIds).size === input.serviceIds.length, {
-  path: ["serviceIds"],
-  message: "Affected services must be unique",
-});
+export const createIncidentSchema = z
+  .object({
+    title: z.string().trim().min(3).max(160),
+    description: z.string().trim().max(5_000).nullable().optional(),
+    priority: z.enum(incidentPriorities).default("medium"),
+    teamId: z.string().uuid().nullable().optional(),
+    serviceIds: z.array(z.uuid()).min(1).max(20),
+    primaryServiceId: z.uuid().nullable().optional(),
+  })
+  .refine(
+    (input) =>
+      !input.primaryServiceId ||
+      input.serviceIds.includes(input.primaryServiceId),
+    {
+      path: ["primaryServiceId"],
+      message: "Primary service must be included in affected services",
+    },
+  )
+  .refine(
+    (input) => new Set(input.serviceIds).size === input.serviceIds.length,
+    {
+      path: ["serviceIds"],
+      message: "Affected services must be unique",
+    },
+  );
 
 export const listIncidentsQuerySchema = z.object({
   serviceId: z.uuid().optional(),
@@ -41,9 +48,12 @@ export const updateIncidentSchema = z
     serviceIds: z.array(z.uuid()).min(1).max(20).optional(),
     primaryServiceId: z.uuid().nullable().optional(),
   })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), {
-    message: "At least one field must be provided",
-  })
+  .refine(
+    (input) => Object.values(input).some((value) => value !== undefined),
+    {
+      message: "At least one field must be provided",
+    },
+  )
   .refine(
     (input) =>
       input.primaryServiceId === undefined ||

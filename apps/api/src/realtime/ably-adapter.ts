@@ -1,4 +1,7 @@
-import { realtimeIncidentSignalSchema, type RealtimeIncidentSignal } from "@incidentflow/contracts";
+import {
+  realtimeIncidentSignalSchema,
+  type RealtimeIncidentSignal,
+} from "@incidentflow/contracts";
 import { SignJWT } from "jose";
 import { z } from "zod";
 
@@ -24,13 +27,16 @@ export class AblyRealtimeAdapter
   private readonly keySecret: Uint8Array;
   private readonly authorization: string;
 
-  constructor(private readonly options: {
-    apiKey: string;
-    maxOutboundPayloadBytes?: number;
-    fetch?: typeof fetch;
-  }) {
+  constructor(
+    private readonly options: {
+      apiKey: string;
+      maxOutboundPayloadBytes?: number;
+      fetch?: typeof fetch;
+    },
+  ) {
     const match = /^([\w-]+\.[\w-]+):([\w+/=-]+)$/.exec(options.apiKey);
-    if (!match) throw new Error("ABLY_API_KEY must contain a key name and secret");
+    if (!match)
+      throw new Error("ABLY_API_KEY must contain a key name and secret");
     this.keyName = match[1]!;
     this.keySecret = new TextEncoder().encode(match[2]!);
     this.authorization = `Basic ${Buffer.from(options.apiKey).toString("base64")}`;
@@ -42,7 +48,10 @@ export class AblyRealtimeAdapter
     const token = await new SignJWT({
       "x-ably-capability": JSON.stringify({ [channel]: ["subscribe"] }),
       "x-ably-clientId": uuid.parse(auth.sessionId),
-      "x-ably-revocation-key": userRevocationKey(auth.organizationId, auth.userId),
+      "x-ably-revocation-key": userRevocationKey(
+        auth.organizationId,
+        auth.userId,
+      ),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT", kid: this.keyName })
       .setIssuedAt()
@@ -61,13 +70,19 @@ export class AblyRealtimeAdapter
     if (parsed.incidentId !== uuid.parse(incidentId)) {
       throw new Error("Realtime publication is invalid");
     }
-    if (Buffer.byteLength(JSON.stringify(parsed)) > (this.options.maxOutboundPayloadBytes ?? 1_024)) {
+    if (
+      Buffer.byteLength(JSON.stringify(parsed)) >
+      (this.options.maxOutboundPayloadBytes ?? 1_024)
+    ) {
       throw new Error("Realtime publication exceeds the payload limit");
     }
-    await this.post(`https://rest.ably.io/channels/${encodeURIComponent(channel)}/messages`, {
-      name: "realtime:incident",
-      data: parsed,
-    });
+    await this.post(
+      `https://rest.ably.io/channels/${encodeURIComponent(channel)}/messages`,
+      {
+        name: "realtime:incident",
+        data: parsed,
+      },
+    );
   }
 
   async disconnectSession(sessionId: string) {
@@ -75,14 +90,19 @@ export class AblyRealtimeAdapter
   }
 
   async disconnectUser(organizationId: string, userId: string) {
-    await this.revoke(`revocationKey:${userRevocationKey(organizationId, userId)}`);
+    await this.revoke(
+      `revocationKey:${userRevocationKey(organizationId, userId)}`,
+    );
   }
 
   private async revoke(target: string) {
-    await this.post(`https://main.realtime.ably.net/keys/${this.keyName}/revokeTokens`, {
-      targets: [target],
-      allowReauthMargin: false,
-    });
+    await this.post(
+      `https://main.realtime.ably.net/keys/${this.keyName}/revokeTokens`,
+      {
+        targets: [target],
+        allowReauthMargin: false,
+      },
+    );
   }
 
   private async post(url: string, body: unknown) {
@@ -104,6 +124,7 @@ export class AblyRealtimeAdapter
       throw new Error("Realtime provider request failed");
     }
     await response.body?.cancel();
-    if (!response.ok) throw new Error(`Realtime provider returned HTTP ${response.status}`);
+    if (!response.ok)
+      throw new Error(`Realtime provider returned HTTP ${response.status}`);
   }
 }

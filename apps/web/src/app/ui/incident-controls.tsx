@@ -28,7 +28,8 @@ export function IncidentControls({
     updateAction,
     initialIncidentFormState,
   );
-  const [currentServiceIds, setCurrentServiceIds] = useState(selectedServiceIds);
+  const [currentServiceIds, setCurrentServiceIds] =
+    useState(selectedServiceIds);
   const [currentPrimaryServiceId, setCurrentPrimaryServiceId] = useState(
     primaryServiceId ?? "",
   );
@@ -54,7 +55,10 @@ export function IncidentControls({
         </select>
       </div>
       <div>
-        <label htmlFor="serviceIds" className="text-sm font-medium text-slate-200">
+        <label
+          htmlFor="serviceIds"
+          className="text-sm font-medium text-slate-200"
+        >
           Affected services
         </label>
         <select
@@ -87,7 +91,10 @@ export function IncidentControls({
         </p>
       </div>
       <div>
-        <label htmlFor="primaryServiceId" className="text-sm font-medium text-slate-200">
+        <label
+          htmlFor="primaryServiceId"
+          className="text-sm font-medium text-slate-200"
+        >
           Primary service
         </label>
         <select
@@ -99,7 +106,9 @@ export function IncidentControls({
         >
           <option value="">Use the first affected service</option>
           {selectedServices.map((service) => (
-            <option key={service.id} value={service.id}>{service.name}</option>
+            <option key={service.id} value={service.id}>
+              {service.name}
+            </option>
           ))}
         </select>
         <p className="mt-1 text-xs text-slate-500">
@@ -125,8 +134,12 @@ export function IncidentControls({
         </select>
       </div>
 
-      {state.error ? <p className="text-sm text-red-300">{state.error}</p> : null}
-      {state.message ? <p className="text-sm text-emerald-300">{state.message}</p> : null}
+      {state.error ? (
+        <p className="text-sm text-red-300">{state.error}</p>
+      ) : null}
+      {state.message ? (
+        <p className="text-sm text-emerald-300">{state.message}</p>
+      ) : null}
 
       <button
         type="submit"

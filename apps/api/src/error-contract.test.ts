@@ -35,7 +35,10 @@ test("validation errors include stable issue paths and codes", async () => {
 });
 
 test("unexpected errors do not expose implementation details", async () => {
-  const app = buildApp({ logger: false, testAuthContext: ownerTestAuthContext });
+  const app = buildApp({
+    logger: false,
+    testAuthContext: ownerTestAuthContext,
+  });
   app.get("/explode", async () => {
     throw new Error("database password leaked");
   });

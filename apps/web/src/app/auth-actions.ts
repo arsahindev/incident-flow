@@ -78,7 +78,9 @@ export async function switchOrganizationAction(formData: FormData) {
     "/v1/auth/switch-organization",
     {
       method: "POST",
-      body: JSON.stringify({ organizationSlug: value(formData, "organizationSlug") }),
+      body: JSON.stringify({
+        organizationSlug: value(formData, "organizationSlug"),
+      }),
     },
     sessionResultResponseSchema,
   );
@@ -128,7 +130,10 @@ export async function createInvitationAction(
     );
     return { error: null, invitationUrl: `/invite/${invitation.token}` };
   } catch (error) {
-    return { error: message(error, "Unable to create the invitation"), invitationUrl: null };
+    return {
+      error: message(error, "Unable to create the invitation"),
+      invitationUrl: null,
+    };
   }
 }
 
